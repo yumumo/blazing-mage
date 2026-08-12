@@ -1,0 +1,11 @@
+﻿node_modules/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+.vscode/
+.idea/
+_smoke_*
+progress.md
+.wrangler/
+dist/

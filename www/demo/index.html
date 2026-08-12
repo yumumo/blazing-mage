@@ -707,22 +707,22 @@
         <div class="shop-card" id="shop-card-magnet">
           <div class="icon-big">🧲</div>
           <div class="meta"><div class="name">磁铁</div><div class="desc">10秒内吸引附近金币</div><div class="owned">拥有 <span id="shop-owned-magnet">0</span></div></div>
-          <button id="buy-magnet">购买 150 金</button>
+          <button id="buy-magnet">购买 100 金</button>
         </div>
         <div class="shop-card" id="shop-card-shield">
           <div class="icon-big">🛡</div>
           <div class="meta"><div class="name">护盾</div><div class="desc">获得1层临时护盾，抵挡1次伤害</div><div class="owned">拥有 <span id="shop-owned-shield">0</span></div></div>
-          <button id="buy-shield">购买 200 金</button>
+          <button id="buy-shield">购买 150 金</button>
         </div>
         <div class="shop-card" id="shop-card-double">
           <div class="icon-big">💰</div>
           <div class="meta"><div class="name">双倍金币</div><div class="desc">本局金币拾取翻倍</div><div class="owned">拥有 <span id="shop-owned-double">0</span></div></div>
-          <button id="buy-double">购买 300 金</button>
+          <button id="buy-double">购买 250 金</button>
         </div>
         <div class="shop-card" id="shop-card-revive">
           <div class="icon-big">❤</div>
           <div class="meta"><div class="name">复活币</div><div class="desc">死亡后原地复活，恢复满血</div><div class="owned">拥有 <span id="shop-owned-revive">0</span></div></div>
-          <button id="buy-revive">购买 500 金</button>
+          <button id="buy-revive">购买 400 金</button>
         </div>
       </div>
       <div class="dots-row"><i class="d1"></i><i class="d2"></i><i class="d3"></i><i class="d4"></i><i class="d5"></i></div>
@@ -772,6 +772,7 @@
     const hudScoreEl = document.getElementById('hud-score');
     const startBtn = document.getElementById('start');
     const homeBtn = document.getElementById('home');
+    const hudCache = { m: -1, g: -1, s: -1 };
 
     // ===================== 音频系统（Web Audio API 程序化生成） =====================
     let audioCtx = null;
@@ -973,8 +974,6 @@
     const ATTACK_CD = 0.2;
     const FB_SPEED = 700;         // 火球基础速度（可通过升级提升）
     const FB_R = 7;
-    const SPRINT_TIME = 3;
-    const SPRINT_H = 250;
     const MAX_HP_LV = 3;          // 生命上限 3
     const MAX_SHD_LV = 1;         // 护盾上限 1
     const MAX_FB_LV = 5;          // 火球速度上限 5
@@ -1107,7 +1106,6 @@
     let duckPressed = false;     // 蹲伏按键（单次触发）
     let fastFalling = false;     // 空中快速下落中
     let atkCd = 0;
-    let sprint = 0;
     let attackFx = 0;
     let invincible = 0;
     let runTime = 0;
@@ -1149,9 +1147,9 @@
 
     // ===================== 道具状态 =====================
     let ownedItems = loadItems();                                        // 持久化库存
-    let activeItems = { magnet: 0, shield: 0, double: false, revive: false }; // 局内激活状态
-    let itemTimers = { magnet: 0 };                                      // 磁铁计时器
-    let equippedItems = { magnet: false, shield: false, double: false, revive: false }; // 局前装备选择
+    let activeItems = { double: false, revive: false }; // 局内激活（磁铁走 itemTimers，护盾走 itemShield）
+    let itemTimers = { magnet: 0 };
+    let equippedItems = { magnet: false, shield: false, double: false, revive: false };
 
     // 天空冲刺状态
     let skySprintTime = 0;         // 天空冲刺已用时间 (s)
@@ -1200,17 +1198,16 @@
 
     // ===================== 派生值 =====================
     // 距离驱动速度倍率：100-300m→1.25x，500-700m→1.5x
-    function distSpeedMul() {
+    function speedMul() {
       const d = distanceM();
       if (d < 100) return 1;
-      if (d < 300) return 1 + (d - 100) / 200 * 0.25;   // 1x → 1.25x 线性
+      if (d < 300) return 1 + (d - 100) / 200 * 0.25;
       if (d < 500) return 1.25;
-      if (d < 700) return 1.25 + (d - 500) / 200 * 0.25; // 1.25x → 1.5x 线性
+      if (d < 700) return 1.25 + (d - 500) / 200 * 0.25;
       return 1.5;
     }
-    const speedMul = () => distSpeedMul();
     const baseSpeed = () => 260 * speedMul();
-    const speed = () => skySprintActive ? skySprintSpeed() : (sprint > 0 ? baseSpeed() + 340 : baseSpeed() + (rollTimer > 0 ? ROLL_SPEED_BOOST : 0));
+    const speed = () => skySprintActive ? skySprintSpeed() : baseSpeed() + (rollTimer > 0 ? ROLL_SPEED_BOOST : 0);
     const distanceM = () => worldX / PX_PER_METER;
     const scoreM = () => Math.floor(distanceM());
     const goldEarned = () => Math.floor(distanceM() / METER_PER_GOLD) + killCount * KILL_GOLD + coinPickups * COIN_VALUE;
@@ -1272,6 +1269,22 @@
         if (pred(arr[r])) arr[w++] = arr[r];
       }
       arr.length = w;
+    }
+
+    /** 清除角色前方 [CHAR_X, safeEnd] 内的危险实体，并铺一段安全地面 */
+    function clearAhead(safeEnd, opts = {}) {
+      const padLeft = opts.padLeft ?? 40;
+      const padRight = opts.padRight ?? 40;
+      platforms.push({ x0: CHAR_X - padLeft, x1: safeEnd + padRight });
+      cullInPlace(walls, (w) => w.x > safeEnd);
+      cullInPlace(beams, (b) => b.x > safeEnd);
+      cullInPlace(monsters, (m) => m.x > safeEnd);
+      cullInPlace(spikes, (s) => s.x > safeEnd);
+      cullInPlace(flyers, (f) => f.x > safeEnd);
+      cullInPlace(gaps, (g) => g.x > safeEnd);
+      cullInPlace(elevatedPlatforms, (p) => p.x0 > safeEnd);
+      if (opts.featureCd != null) featureCooldown = Math.max(featureCooldown, opts.featureCd);
+      if (opts.gapCd != null) gapCooldown = Math.max(gapCooldown, opts.gapCd);
     }
 
     // ===================== 世界生成 =====================
@@ -1609,7 +1622,7 @@
       platforms = []; gaps = []; walls = []; beams = [];
       monsters = []; fireballs = []; floats = []; coins = [];
       elevatedPlatforms = []; spikes = []; flyers = [];
-      px = 0; vy = 0; ducking = false; rollTimer = 0; rollCdTimer = 0; fastFalling = false; atkCd = 0; sprint = 0; attackFx = 0;
+      px = 0; vy = 0; ducking = false; rollTimer = 0; rollCdTimer = 0; fastFalling = false; atkCd = 0; attackFx = 0;
       worldX = 0; killCount = 0; runTime = 0;
       genX = 0; gapCooldown = 3; invincible = 0;
       energy = ENERGY_MAX; canDoubleJump = false;
@@ -1638,7 +1651,7 @@
       portal = null; transitionFx = 0; bonusReturnDist = 0;
       bonusFinaleSpawned = false;
       // 道具状态重置 + 从 ownedItems 装备选中的道具
-      activeItems = { magnet: 0, shield: 0, double: false, revive: false };
+      activeItems = { double: false, revive: false };
       itemTimers = { magnet: 0 };
       if (equippedItems.revive && ownedItems.revive > 0) { activeItems.revive = true; ownedItems.revive--; }
       if (equippedItems.double && ownedItems.double > 0) { activeItems.double = true; ownedItems.double--; }
@@ -1650,6 +1663,7 @@
       over = false;
       lastTs = performance.now();
       running = true;
+      hudCache.m = hudCache.g = hudCache.s = -1;
       document.getElementById('screen-game').classList.add('is-playing');
       startBtn.textContent = '重新开始';
       startBtn.disabled = true;
@@ -1675,21 +1689,20 @@
     }
 
     function gameOver() {
-      // 复活币：自动使用，原地复活
+      // 复活币：自动使用；必须拉回地面，否则掉坑死亡会下一帧再次触发秒死
       if (activeItems.revive) {
         activeItems.revive = false;
         hp = Math.min(lvHp, MAX_HP_LV);
         invincible = 2;
+        px = 0;
+        vy = 0;
+        onPlatformY = 0;
+        ducking = false;
+        rollTimer = 0;
+        fastFalling = false;
         running = true;
         over = false;
-        // 清除附近障碍物保证安全复活
-        const safeEnd = CHAR_X + 500;
-        cullInPlace(walls, (w) => w.x > safeEnd);
-        cullInPlace(beams, (b) => b.x > safeEnd);
-        cullInPlace(monsters, (m) => m.x > safeEnd);
-        cullInPlace(spikes, (s) => s.x > safeEnd);
-        cullInPlace(flyers, (f) => f.x > safeEnd);
-        cullInPlace(gaps, (g) => g.x > safeEnd);
+        clearAhead(CHAR_X + 500, { featureCd: 3, gapCd: 3 });
         floats.push({ x: CHAR_X, y: GROUND - 260, t: 1.5, text: '复活!' });
         sfxSprint();
         return;
@@ -1971,23 +1984,8 @@
           invincible = 2.0;
           px = 0;
           // 着陆安全区：30m（780px）内无障碍无怪物
-          const safeEnd = CHAR_X + 780;
-          platforms.push({ x0: CHAR_X - 40, x1: safeEnd + 40 });
-          cullInPlace(walls, (w) => w.x > safeEnd);
-          cullInPlace(beams, (b) => b.x > safeEnd);
-          cullInPlace(monsters, (m) => m.x > safeEnd);
-          cullInPlace(spikes, (s) => s.x > safeEnd);
-          cullInPlace(flyers, (f) => f.x > safeEnd);
-          cullInPlace(gaps, (g) => g.x > safeEnd);
-          cullInPlace(elevatedPlatforms, (p) => p.x0 > safeEnd);
-          featureCooldown = 4;
-          gapCooldown = 4;
+          clearAhead(CHAR_X + 780, { featureCd: 4, gapCd: 4 });
         }
-      } else if (sprint > 0) {
-        px = SPRINT_H;
-        vy = 0;
-        ducking = false; rollTimer = 0;
-        sprint -= dt;
       } else if (puTimers.fly > 0) {
         // 起飞道具：角色悬浮高空，免疫一切障碍
         px = 200;
@@ -2064,17 +2062,7 @@
 
       // 起飞道具落地安全区：检测从飞行到落地的瞬间，清除前方10m内障碍
       if (wasFlyActive && puTimers.fly <= 0 && !skySprintActive) {
-        const safeEnd = CHAR_X + 260; // 10m 安全区
-        platforms.push({ x0: CHAR_X - 40, x1: safeEnd + 40 });
-        cullInPlace(walls, (w) => w.x > safeEnd);
-        cullInPlace(beams, (b) => b.x > safeEnd);
-        cullInPlace(monsters, (m) => m.x > safeEnd);
-        cullInPlace(spikes, (s) => s.x > safeEnd);
-        cullInPlace(flyers, (f) => f.x > safeEnd);
-        cullInPlace(gaps, (g) => g.x > safeEnd);
-        cullInPlace(elevatedPlatforms, (p) => p.x0 > safeEnd);
-        featureCooldown = Math.max(featureCooldown, 3);
-        gapCooldown = Math.max(gapCooldown, 3);
+        clearAhead(CHAR_X + 260, { featureCd: 3, gapCd: 3 });
         invincible = Math.max(invincible, 1.0);
       }
       wasFlyActive = puTimers.fly > 0;
@@ -2145,8 +2133,8 @@
         if (hit) fireballs.splice(i, 1);
       }
 
-      // 碰撞（冲刺/天空冲刺/起飞中免疫）
-      if (sprint <= 0 && !skySprintActive && puTimers.fly <= 0) {
+      // 碰撞（天空冲刺/起飞中免疫）
+      if (!skySprintActive && puTimers.fly <= 0) {
         for (const wE of walls) {
           const wb = { x: wE.x, y: GROUND - WALL_H, w: wE.w, h: WALL_H };
           if (overlap(charBox, wb)) hurtPlayer(1);
@@ -2241,10 +2229,13 @@
       for (const f of floats) f.t -= dt;
       cullInPlace(floats, (f) => f.t > 0);
 
-      // HUD 更新
-      scoreEl.textContent = scoreM();
-      hudGoldEl.textContent = goldEarned();
-      hudScoreEl.textContent = scoreVal();
+      // HUD 更新（值变化才写 DOM，减少强制布局）
+      const sm = scoreM();
+      const ge = goldEarned();
+      const sv = scoreVal();
+      if (sm !== hudCache.m) { hudCache.m = sm; scoreEl.textContent = sm; }
+      if (ge !== hudCache.g) { hudCache.g = ge; hudGoldEl.textContent = ge; }
+      if (sv !== hudCache.s) { hudCache.s = sv; hudScoreEl.textContent = sv; }
     }
 
     // ===================== 背景动画系统 =====================
@@ -3195,20 +3186,6 @@
         ctx.textAlign = 'left';
       }
 
-      // 冲刺指示
-      if (sprint > 0) {
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(W / 2 - 80, 14, 160, 40);
-        ctx.fillStyle = '#ffd93d';
-        ctx.font = 'bold 14px system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(`护盾时刻 ${sprint.toFixed(1)}s`, W / 2, 31);
-        ctx.font = '11px system-ui, sans-serif';
-        ctx.fillStyle = '#fff3c4';
-        ctx.fillText('无敌冲刺中', W / 2, 45);
-        ctx.textAlign = 'left';
-      }
-
       // 横屏覆盖 HUD：分数（血量护盾下方）、金币+距离（速度下方）
       if (document.getElementById('screen-game').classList.contains('game-landscape')) {
         // 分数（左上，能量条下方）
@@ -3563,13 +3540,12 @@
       drawWalls();
       drawBeams();
       drawSpikes();
-      // 高速速度线（速度倍率 ≥1.5 或冲刺中）
-      if (sprint > 0 || speedMul() >= 1.5) {
-        const intensity = sprint > 0 ? 0.6 : Math.min(0.4, (speedMul() - 1) * 0.2);
+      // 高速速度线（速度倍率 ≥1.5）
+      if (speedMul() >= 1.5) {
+        const intensity = Math.min(0.4, (speedMul() - 1) * 0.2);
         ctx.strokeStyle = `rgba(255,217,61,${intensity})`;
         ctx.lineWidth = 2;
-        const count = sprint > 0 ? 12 : 7;
-        for (let i = 0; i < count; i++) {
+        for (let i = 0; i < 7; i++) {
           const yy = 20 + i * 36;
           const ll = 30 + (i % 3) * 18;
           ctx.beginPath();
@@ -3596,7 +3572,11 @@
     }
 
     // ===================== 性能监控 =====================
-    let perfFrames = [];       // 最近 60 帧的帧时间
+    const PERF_WINDOW = 60;
+    const perfFrames = new Float64Array(PERF_WINDOW);
+    let perfFrameCount = 0;
+    let perfFrameIdx = 0;
+    let perfFrameSum = 0;
     let perfLastTs = 0;
     let perfFps = 60;
     let perfFrameTime = 16.7;
@@ -3610,11 +3590,19 @@
     function perfTick(ts) {
       const ft = perfLastTs > 0 ? ts - perfLastTs : 16.7;
       perfLastTs = ts;
-      perfFrames.push(ft);
-      if (perfFrames.length > 60) perfFrames.shift();
+      if (perfFrameCount < PERF_WINDOW) {
+        perfFrames[perfFrameIdx] = ft;
+        perfFrameSum += ft;
+        perfFrameCount++;
+        perfFrameIdx = (perfFrameIdx + 1) % PERF_WINDOW;
+      } else {
+        perfFrameSum -= perfFrames[perfFrameIdx];
+        perfFrames[perfFrameIdx] = ft;
+        perfFrameSum += ft;
+        perfFrameIdx = (perfFrameIdx + 1) % PERF_WINDOW;
+      }
       if (ft > 20) perfSlowCount++;
-      const sum = perfFrames.reduce((a, b) => a + b, 0);
-      perfFrameTime = sum / perfFrames.length;
+      perfFrameTime = perfFrameSum / perfFrameCount;
       perfFps = Math.round(1000 / perfFrameTime);
     }
 
@@ -4101,7 +4089,7 @@
       player: {
         x: CHAR_X, feetY: Math.round(GROUND - px), vy: Math.round(vy),
         ducking, rollTimer: +rollTimer.toFixed(2), hp, shield, itemShield, onPlatformY,
-        sprint: +sprint.toFixed(1), invincible: +invincible.toFixed(1),
+        invincible: +invincible.toFixed(1),
         canDoubleJump, energy: Math.round(energy),
         skySprintActive, skySprintTime: +skySprintTime.toFixed(2),
       },

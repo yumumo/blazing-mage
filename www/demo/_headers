@@ -1,0 +1,7 @@
+# 单页游戏：长期缓存 HTML 以外的静态资源（当前仅 index.html）
+/
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+
+/index.html
+  Cache-Control: public, max-age=60, must-revalidate

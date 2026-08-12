@@ -4,22 +4,22 @@
 
 ## 发布结构
 
-发布到 GitHub / Cloudflare Pages 时只需要：
+本仓对应 XRK-AGT Core 静态应用：`www/demo/`（挂载路径 `/demo`）。
+
+Cloudflare Pages（见根目录 `wrangler.toml`）：
 
 ```text
-index.html
-README.md
-.gitignore
+pages_build_output_dir = "www/demo"
 ```
 
-如果从 Core 目录发布，游戏入口是 `core/demo-Core/www/demo/index.html`；如果使用独立仓库，保持 `index.html` 位于仓库根目录即可。
+无构建命令；产物内为 `index.html`（及 `_headers`）。独立发布与 AGT 内挂载共用同一入口文件。
 
 ## 核心数值
 
 | 量 | 当前值 | 说明 |
 |---|---:|---|
 | 画布 | 800 × 500 | 横版网页游戏，适配手机横屏 |
-| 地面线 | `GROUND = 480` | 角色脚底与平台判定基准 |
+| 地面线 | `GROUND = 420` | 角色脚底与平台判定基准 |
 | 基准单位 | `U = 40` | 角色、怪物、障碍尺寸基础 |
 | 距离换算 | `PX_PER_METER = 26` | 260px/s ≈ 10m/s |
 | 基础速度 | `260 * speedMul()` | 随距离分段提升 |
@@ -77,7 +77,7 @@ README.md
 
 发布前至少检查：
 
-- 根目录存在 `index.html`。
+- `www/demo/index.html` 存在。
 - 搜索不到 `assets/`、`.png`、`new Image` 等图片依赖。
 - 桌面端可进入游戏，触控按钮可触发跳跃和攻击。
 - 手机窄屏没有横向滚动，横屏下画布和按钮都可见。
