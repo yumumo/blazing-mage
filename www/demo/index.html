@@ -994,19 +994,21 @@
     const SKY_SPRINT_SPEED_MAX = 2800; // 最大速度 px/s（3秒内覆盖约300m）
 
     // 新手教程（交互式，仅首次游玩）
-    const TUTORIAL_END = 320;     // 教程结束距离
+    // 动作提示会冻结滚动；冻结期间不得消耗翻滚/滞空时间，否则按提示仍会撞死。
+    const TUTORIAL_END = 420;
     const TUTORIAL_STEPS = [
-      { m: 8,   type: 'info',    title: '基本操作', text: 'W/↑ 跳跃 · S/↓ 翻滚 · J 攻击', wait: 2.5 },
-      { m: 35,  type: 'wall',    title: '跳跃躲避', text: '按 W 或 ↑ 跳过墙壁！', action: 'jump' },
-      { m: 70,  type: 'beam',    title: '翻滚穿越', text: '按 S 或 ↓ 翻滚穿过横梁！', action: 'duck' },
-      { m: 105, type: 'gap',     title: '跨越坑洞', text: '前方有坑，跳跃跨过去！', action: 'jump' },
-      { m: 140, type: 'monster', title: '火球攻击', text: '按 J 发射火球击败怪物！', action: 'attack' },
-      { m: 175, type: 'info',    title: '受伤机制', text: '碰障碍扣血，护盾可抵挡一次并触发天空冲刺', wait: 3 },
-      { m: 215, type: 'coins',   title: '收集金币', text: '收集金币获得额外奖励！', action: 'coin' },
-      { m: 260, type: 'info',    title: '速度提升', text: '距离越远速度越快，做好准备！', wait: 2.5 },
-      { m: 300, type: 'info',    title: '教程完成', text: '祝你好运，开始冒险吧！', wait: 2.5 },
+      { m: 12,  type: 'info',    title: '基本操作', text: 'W/↑ 跳跃 · S/↓ 翻滚 · J 攻击', wait: 2.8 },
+      { m: 55,  type: 'wall',    title: '跳跃躲避', text: '按 W 或 ↑ 跳过墙壁！', action: 'jump' },
+      { m: 110, type: 'beam',    title: '翻滚穿越', text: '按 S 或 ↓ 翻滚穿过横梁！', action: 'duck' },
+      { m: 165, type: 'gap',     title: '跨越坑洞', text: '前方有坑，跳跃跨过去！', action: 'jump' },
+      { m: 220, type: 'monster', title: '火球攻击', text: '按 J 发射火球击败怪物！', action: 'attack' },
+      { m: 270, type: 'info',    title: '受伤机制', text: '碰障碍扣血，护盾可抵挡一次并触发天空冲刺', wait: 3 },
+      { m: 320, type: 'coins',   title: '收集金币', text: '收集金币获得额外奖励！', action: 'coin', freeze: false },
+      { m: 370, type: 'info',    title: '速度提升', text: '距离越远速度越快，做好准备！', wait: 2.5 },
+      { m: 410, type: 'info',    title: '教程完成', text: '祝你好运，开始冒险吧！', wait: 2.5 },
     ];
-    const TUTORIAL_LEAD_PX = 200; // 教程物品前置像素：物品比教程文字晚到达，给玩家反应时间
+    // 提示出现时障碍约在角色前方；翻滚仅 ~0.55s，lead 过长会在翻滚结束前到不了横梁
+    const TUTORIAL_LEAD_PX = 130;
 
     // 能量系统（限制子弹滥用）
     const ENERGY_MAX = 100;
@@ -1215,7 +1217,10 @@
     const currentTutorialStep = () => tutorialActive && tutorialStep < TUTORIAL_STEPS.length ? TUTORIAL_STEPS[tutorialStep] : null;
     const tutorialActionFreezing = () => {
       const step = currentTutorialStep();
-      return Boolean(tutorialShown && step?.action && !tutorialActionDone);
+      // 收集类步骤不能冻屏，否则金币到不了角色
+      if (!tutorialShown || !step?.action || tutorialActionDone) return false;
+      if (step.freeze === false) return false;
+      return true;
     };
 
     // ===================== UI 切换 =====================
@@ -1735,6 +1740,8 @@
     }
 
     function hurtPlayer(dmg) {
+      // 教程中按提示操作不应扣血（冻结时翻滚/跳跃计时曾被消耗导致误死）
+      if (tutorialActive) return;
       if (invincible > 0 || skySprintActive) return;
       // 道具护盾优先消耗（不触发天空冲刺，仅消失）
       if (itemShield > 0) {
@@ -1767,7 +1774,7 @@
     }
 
     function escapePit() {
-      if (window.testCheat) { px = 0; vy = 0; return; }
+      if (window.testCheat || tutorialActive) { px = 0; vy = 0; return; }
       if (itemShield > 0) {
         itemShield--;
         invincible = 1.0;
@@ -1811,9 +1818,12 @@
     function update(dt) {
       // 测试模式：无敌+防掉坑
       if (window.testCheat) { invincible = 999; hp = Math.max(hp, 1); if (px < 0) { px = 0; vy = 0; } }
-      // 翻滚计时器
-      rollTimer = Math.max(0, rollTimer - dt);
-      rollCdTimer = Math.max(0, rollCdTimer - dt);
+      const tutFreeze = tutorialActionFreezing();
+      // 动作提示冻结世界时，不消耗翻滚/冷却（否则提示期间翻滚已结束，恢复滚动必撞梁）
+      if (!tutFreeze) {
+        rollTimer = Math.max(0, rollTimer - dt);
+        rollCdTimer = Math.max(0, rollCdTimer - dt);
+      }
       let spd = speed();
       atkCd = Math.max(0, atkCd - dt);
       attackFx = Math.max(0, attackFx - dt);
@@ -1871,7 +1881,7 @@
       }
 
       // 教程动作提示期间暂停世界滚动，避免怪物/障碍离屏后教程步骤永久卡住。
-      if (tutorialActionFreezing()) spd = 0;
+      if (tutFreeze) spd = 0;
 
       // 世界位移
       worldX += spd * dt;
@@ -2011,8 +2021,8 @@
         const currentGround = onPlatformY;
         const grounded = px <= currentGround + 0.5 && vy <= 0 && (currentGround > 0 || groundAt(CHAR_X));
 
-        // 空中按下蹲伏 → 快速落地
-        if (duckPressed && !grounded && !fastFalling) {
+        // 空中按下蹲伏 → 快速落地（教程冻结时不触发，避免提前落地）
+        if (!tutFreeze && duckPressed && !grounded && !fastFalling) {
           vy = -FAST_FALL_V;
           fastFalling = true;
         }
@@ -2023,19 +2033,25 @@
           canDoubleJump = true;
           sfxJump();
           if (tutorialShown && tutorialStep < TUTORIAL_STEPS.length && TUTORIAL_STEPS[tutorialStep].action === 'jump') tutorialActionDone = true;
-        } else if (!grounded && jumpPressed && canDoubleJump) {
+        } else if (!tutFreeze && !grounded && jumpPressed && canDoubleJump) {
           // 二段跳：稍弱的主跳
           vy = Math.max(vy, 0) + DOUBLE_JUMP_V;
           canDoubleJump = false;
-          fastFalling = false; // 二段跳取消快速下落
+          fastFalling = false;
         }
-        if (!grounded || vy > 0) {
-          // 快速下落时使用更强重力
+
+        if (tutFreeze) {
+          // 冻结期间起跳可升到最高点后悬停，恢复滚动后仍能越过墙/坑
+          if (!grounded && vy !== 0) {
+            px += vy * dt;
+            vy -= GRAV * dt;
+            if (vy < 0) vy = 0;
+          }
+        } else if (!grounded || vy > 0) {
           const g = fastFalling ? GRAV * 2.5 : GRAV;
           vy -= g * dt;
           const oldPx = px;
           px += vy * dt;
-          // 高台着陆检测（下落时穿越高台 y 线）
           if (vy < 0) {
             for (const p of elevatedPlatforms) {
               if (CHAR_X >= p.x0 && CHAR_X <= p.x1 && oldPx > p.y && px <= p.y) {
@@ -2050,7 +2066,7 @@
           }
         }
         // 地面着陆检测
-        if (onPlatformY === 0 && vy <= 0 && px <= 0 && groundAt(CHAR_X)) {
+        if (!tutFreeze && onPlatformY === 0 && vy <= 0 && px <= 0 && groundAt(CHAR_X)) {
           px = 0;
           vy = 0;
           canDoubleJump = false;
@@ -2577,93 +2593,86 @@
         const cy = GROUND - mh / 2 - bob;
 
         if (mo.big) {
-          // 大怪：暗影巨兽
-          ctx.fillStyle = 'rgba(0,0,0,0.2)';
-          ctx.beginPath(); ctx.ellipse(cx, GROUND - 2, mw / 2, 4, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = 'rgba(0,0,0,0.22)';
+          ctx.beginPath(); ctx.ellipse(cx, GROUND - 2, mw / 2 + 2, 5, 0, 0, Math.PI * 2); ctx.fill();
 
-          // 腿
-          ctx.fillStyle = '#3d1f5c'; ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2;
-          const bRun = Math.sin(animT * 8 + mo.phase) * 3;
-          ctx.fillRect(cx - 14, GROUND - 14 + bRun, 8, 14); ctx.strokeRect(cx - 14, GROUND - 14 + bRun, 8, 14);
-          ctx.fillRect(cx + 6, GROUND - 14 - bRun, 8, 14); ctx.strokeRect(cx + 6, GROUND - 14 - bRun, 8, 14);
+          const bRun = Math.sin(animT * 7 + mo.phase) * 3;
+          ctx.fillStyle = '#2a1040'; ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2;
+          ctx.fillRect(cx - 16, GROUND - 16 + bRun, 9, 16); ctx.strokeRect(cx - 16, GROUND - 16 + bRun, 9, 16);
+          ctx.fillRect(cx + 7, GROUND - 16 - bRun, 9, 16); ctx.strokeRect(cx + 7, GROUND - 16 - bRun, 9, 16);
 
-          // 身体
-          ctx.fillStyle = '#5a2d8c';
+          ctx.fillStyle = '#6b3fa0';
           ctx.beginPath();
-          ctx.moveTo(cx - 18, cy + 8);
-          ctx.bezierCurveTo(cx - 22, cy - 10, cx - 16, cy - 26, cx, cy - 28);
-          ctx.bezierCurveTo(cx + 16, cy - 26, cx + 22, cy - 10, cx + 18, cy + 8);
+          ctx.moveTo(cx - 20, cy + 10);
+          ctx.bezierCurveTo(cx - 26, cy - 8, cx - 18, cy - 30, cx, cy - 34);
+          ctx.bezierCurveTo(cx + 18, cy - 30, cx + 26, cy - 8, cx + 20, cy + 10);
           ctx.closePath(); ctx.fill(); ctx.stroke();
 
-          // 胸口标记
           ctx.fillStyle = '#ff6b35';
           ctx.beginPath();
-          ctx.moveTo(cx - 6, cy - 8); ctx.lineTo(cx, cy - 2);
-          ctx.lineTo(cx + 6, cy - 8); ctx.lineTo(cx, cy - 14);
+          ctx.moveTo(cx, cy - 22); ctx.lineTo(cx + 8, cy - 8); ctx.lineTo(cx, cy + 2); ctx.lineTo(cx - 8, cy - 8);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle = '#ffd93d';
+          ctx.beginPath();
+          ctx.moveTo(cx, cy - 18); ctx.lineTo(cx + 4, cy - 9); ctx.lineTo(cx, cy - 2); ctx.lineTo(cx - 4, cy - 9);
           ctx.closePath(); ctx.fill();
 
-          // 角
           ctx.fillStyle = '#1a1a1a';
           ctx.beginPath();
-          ctx.moveTo(cx - 12, cy - 22); ctx.lineTo(cx - 16, cy - 38); ctx.lineTo(cx - 8, cy - 24);
+          ctx.moveTo(cx - 14, cy - 26); ctx.lineTo(cx - 20, cy - 44); ctx.lineTo(cx - 8, cy - 28);
           ctx.closePath(); ctx.fill();
           ctx.beginPath();
-          ctx.moveTo(cx + 12, cy - 22); ctx.lineTo(cx + 16, cy - 38); ctx.lineTo(cx + 8, cy - 24);
+          ctx.moveTo(cx + 14, cy - 26); ctx.lineTo(cx + 20, cy - 44); ctx.lineTo(cx + 8, cy - 28);
           ctx.closePath(); ctx.fill();
 
-          // 眼睛（红光）
-          ctx.fillStyle = '#ff3030';
-          ctx.beginPath(); ctx.arc(cx - 7, cy - 14, 4, 0, Math.PI * 2); ctx.arc(cx + 7, cy - 14, 4, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#ff3b3b';
+          ctx.shadowColor = '#ff6b35'; ctx.shadowBlur = 8;
+          ctx.beginPath(); ctx.arc(cx - 8, cy - 16, 4.5, 0, Math.PI * 2); ctx.arc(cx + 8, cy - 16, 4.5, 0, Math.PI * 2); ctx.fill();
+          ctx.shadowBlur = 0;
           ctx.fillStyle = '#fff';
-          ctx.beginPath(); ctx.arc(cx - 7, cy - 14, 1.5, 0, Math.PI * 2); ctx.arc(cx + 7, cy - 14, 1.5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(cx - 7, cy - 17, 1.6, 0, Math.PI * 2); ctx.arc(cx + 9, cy - 17, 1.6, 0, Math.PI * 2); ctx.fill();
 
-          // 嘴 + 獠牙
-          ctx.fillStyle = '#1a0a0a';
-          ctx.beginPath(); ctx.ellipse(cx, cy - 4, 8, 4, 0, 0, Math.PI); ctx.fill();
-          ctx.fillStyle = '#fff';
+          ctx.fillStyle = '#120812';
+          ctx.beginPath(); ctx.ellipse(cx, cy - 4, 9, 5, 0, 0, Math.PI); ctx.fill();
+          ctx.fillStyle = '#fff5e1';
           ctx.beginPath();
-          ctx.moveTo(cx - 5, cy - 4); ctx.lineTo(cx - 3, cy + 1); ctx.lineTo(cx - 1, cy - 4);
-          ctx.lineTo(cx + 1, cy + 1); ctx.lineTo(cx + 3, cy - 4); ctx.lineTo(cx + 5, cy + 1);
+          ctx.moveTo(cx - 6, cy - 4); ctx.lineTo(cx - 3, cy + 3); ctx.lineTo(cx, cy - 4);
+          ctx.lineTo(cx + 3, cy + 3); ctx.lineTo(cx + 6, cy - 4);
           ctx.closePath(); ctx.fill();
         } else {
-          // 小怪：暗影哥布林
           ctx.fillStyle = 'rgba(0,0,0,0.2)';
-          ctx.beginPath(); ctx.ellipse(cx, GROUND - 2, mw / 2, 3, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(cx, GROUND - 2, mw / 2 + 1, 3.5, 0, 0, Math.PI * 2); ctx.fill();
 
-          // 腿
-          ctx.fillStyle = '#1a3a5c';
           const sRun = Math.sin(animT * 10 + mo.phase) * 2;
-          ctx.fillRect(cx - 7, GROUND - 8 + sRun, 5, 8);
-          ctx.fillRect(cx + 2, GROUND - 8 - sRun, 5, 8);
+          ctx.fillStyle = '#1e3a5f';
+          ctx.fillRect(cx - 8, GROUND - 9 + sRun, 5, 9);
+          ctx.fillRect(cx + 3, GROUND - 9 - sRun, 5, 9);
 
-          // 身体
-          ctx.fillStyle = '#2d5a8c'; ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.arc(cx, cy, mw / 2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#3d7ea6'; ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(cx, cy, mw / 2 + 1, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#2a5f86';
+          ctx.beginPath(); ctx.arc(cx - 2, cy - 2, mw / 3, 0, Math.PI * 2); ctx.fill();
 
-          // 小角
           ctx.fillStyle = '#1a1a1a';
           ctx.beginPath();
-          ctx.moveTo(cx - 7, cy - 10); ctx.lineTo(cx - 10, cy - 18); ctx.lineTo(cx - 4, cy - 11);
+          ctx.moveTo(cx - 8, cy - 10); ctx.lineTo(cx - 12, cy - 20); ctx.lineTo(cx - 4, cy - 12);
           ctx.closePath(); ctx.fill();
           ctx.beginPath();
-          ctx.moveTo(cx + 7, cy - 10); ctx.lineTo(cx + 10, cy - 18); ctx.lineTo(cx + 4, cy - 11);
+          ctx.moveTo(cx + 8, cy - 10); ctx.lineTo(cx + 12, cy - 20); ctx.lineTo(cx + 4, cy - 12);
           ctx.closePath(); ctx.fill();
 
-          // 眼睛（黄光）
           ctx.fillStyle = '#ffd93d';
-          ctx.beginPath(); ctx.arc(cx - 5, cy - 2, 3, 0, Math.PI * 2); ctx.arc(cx + 5, cy - 2, 3, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(cx - 5, cy - 2, 3.2, 0, Math.PI * 2); ctx.arc(cx + 5, cy - 2, 3.2, 0, Math.PI * 2); ctx.fill();
           ctx.fillStyle = '#1a1a1a';
-          ctx.beginPath(); ctx.arc(cx - 5, cy - 2, 1.5, 0, Math.PI * 2); ctx.arc(cx + 5, cy - 2, 1.5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(cx - 4.5, cy - 2, 1.4, 0, Math.PI * 2); ctx.arc(cx + 5.5, cy - 2, 1.4, 0, Math.PI * 2); ctx.fill();
 
-          // 嘴 + 牙
           ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1.5;
-          ctx.beginPath(); ctx.arc(cx, cy + 4, 4, 0, Math.PI); ctx.stroke();
+          ctx.beginPath(); ctx.arc(cx, cy + 5, 4.5, 0.1, Math.PI - 0.1); ctx.stroke();
           ctx.fillStyle = '#fff';
-          ctx.fillRect(cx - 2, cy + 4, 1.5, 2);
-          ctx.fillRect(cx + 0.5, cy + 4, 1.5, 2);
+          ctx.fillRect(cx - 2.5, cy + 5, 1.6, 2.4);
+          ctx.fillRect(cx + 0.8, cy + 5, 1.6, 2.4);
         }
 
-        // 血条
         const bw = mo.big ? 34 : 24;
         const maxHp = mo.big ? 2 : 1;
         ctx.fillStyle = '#1a1a1a';
@@ -2829,69 +2838,57 @@
       const cx = CHAR_X;
       const cy = GROUND - px;
 
-      // 翻滚状态：画成旋转球体
+      // 翻滚：烈焰滚动球
       if (rollTimer > 0) {
         ctx.save();
         if (invincible > 0 && Math.floor(animT * 12) % 2 === 0) ctx.globalAlpha = 0.55;
         ctx.translate(cx, cy - 14);
-        const rot = animT * 16;
-        ctx.rotate(rot);
-        // 主体球（蓝色）
+        ctx.rotate(animT * 18);
+        ctx.fillStyle = 'rgba(255,107,53,0.35)';
+        ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#2d7dd2';
         ctx.strokeStyle = '#1a1a1a';
         ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        // 披风尾迹（橙色弧）
         ctx.fillStyle = '#ff6b35';
-        ctx.beginPath(); ctx.arc(0, 0, 15, Math.PI * 0.6, Math.PI * 1.2); ctx.lineTo(0, 0); ctx.closePath(); ctx.fill();
-        // 旋转指示线
-        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-        ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(10, 0); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(0, 10); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, -15); ctx.quadraticCurveTo(18, -4, 8, 12);
+        ctx.quadraticCurveTo(0, 6, -8, 12); ctx.quadraticCurveTo(-18, -4, 0, -15);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#ffd93d';
+        ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
-        // 翻滚残影
-        ctx.fillStyle = 'rgba(45,125,210,0.25)';
+        ctx.fillStyle = 'rgba(255,107,53,0.22)';
         for (let i = 1; i <= 3; i++) {
-          ctx.beginPath(); ctx.arc(cx - i * 14, cy - 14, 15 - i * 3, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(cx - i * 13, cy - 14, 14 - i * 2.5, 0, Math.PI * 2); ctx.fill();
         }
         ctx.globalAlpha = 1;
         return;
       }
 
       const bob = ducking ? 0 : Math.sin(animT * 8) * 2;
-      const hMul = ducking ? 0.5 : 1;
+      const hMul = ducking ? 0.55 : 1;
 
-      // 道具光环效果（天空冲刺/起飞时自动显示磁铁光环）
       if (puTimers.magnet > 0 || itemTimers.magnet > 0 || skySprintActive || puTimers.fly > 0) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(132,94,194,0.18)';
-        ctx.beginPath(); ctx.arc(cx, cy - 30 + bob, 45 + Math.sin(animT * 5) * 5, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
+        ctx.fillStyle = 'rgba(132,94,194,0.16)';
+        ctx.beginPath(); ctx.arc(cx, cy - 30 + bob, 46 + Math.sin(animT * 5) * 4, 0, Math.PI * 2); ctx.fill();
       }
       if (puTimers.double > 0) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(255,217,61,0.15)';
-        ctx.beginPath(); ctx.arc(cx, cy - 30 + bob, 42 + Math.sin(animT * 4) * 4, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
+        ctx.fillStyle = 'rgba(255,217,61,0.14)';
+        ctx.beginPath(); ctx.arc(cx, cy - 30 + bob, 42 + Math.sin(animT * 4) * 3, 0, Math.PI * 2); ctx.fill();
       }
       if (puTimers.attack > 0) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(255,107,53,' + (0.15 + Math.sin(animT * 8) * 0.08) + ')';
+        ctx.fillStyle = `rgba(255,107,53,${0.14 + Math.sin(animT * 8) * 0.07})`;
         ctx.beginPath(); ctx.arc(cx, cy - 30 + bob, 40 + Math.sin(animT * 6) * 3, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
       }
       if (puTimers.fly > 0) {
-        // 飞行翅膀粒子
-        ctx.save();
-        ctx.fillStyle = 'rgba(0,201,167,0.3)';
+        ctx.fillStyle = 'rgba(0,201,167,0.28)';
         for (let i = 0; i < 4; i++) {
           const a = animT * 3 + i * 1.57;
-          const wx = cx + Math.cos(a) * 30;
-          const wy = cy - 30 + bob + Math.sin(a) * 15;
-          ctx.beginPath(); ctx.arc(wx, wy, 4, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath();
+          ctx.arc(cx + Math.cos(a) * 30, cy - 30 + bob + Math.sin(a) * 14, 4, 0, Math.PI * 2);
+          ctx.fill();
         }
-        ctx.restore();
       }
 
       ctx.save();
@@ -2900,139 +2897,113 @@
       ctx.scale(1, hMul);
 
       const run = Math.sin(animT * 10);
+      const cape = Math.sin(animT * 5.5) * 5;
 
-      // 飘逸披风（身后向左飘，侧面只能看到身后披风）
-      const capeFlow = Math.sin(animT * 6) * 4;
+      // 地面阴影
+      ctx.fillStyle = 'rgba(26,26,26,0.18)';
+      ctx.beginPath(); ctx.ellipse(0, 2, 16, 4, 0, 0, Math.PI * 2); ctx.fill();
+
+      // 火焰披风（大轮廓）
       ctx.fillStyle = '#ff6b35';
       ctx.strokeStyle = '#1a1a1a';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(-2, -48);
+      ctx.quadraticCurveTo(-18 + cape, -40, -28 + cape, -8);
+      ctx.quadraticCurveTo(-22, 2, -12, 0);
+      ctx.quadraticCurveTo(-16, -18, -6, -36);
+      ctx.quadraticCurveTo(-2, -42, -2, -48);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffd93d';
       ctx.beginPath();
       ctx.moveTo(-4, -44);
-      ctx.quadraticCurveTo(-14 + capeFlow, -36, -22 + capeFlow, -16);
-      ctx.quadraticCurveTo(-20, -12, -16, -10);
-      ctx.quadraticCurveTo(-12, -28, -4, -38);
+      ctx.quadraticCurveTo(-14 + cape * 0.6, -30, -18 + cape * 0.5, -10);
+      ctx.quadraticCurveTo(-10, -16, -6, -34);
       ctx.closePath();
-      ctx.fill(); ctx.stroke();
+      ctx.fill();
 
-      // 后腿（部分被前腿遮挡，侧面视角）
-      ctx.fillStyle = '#1a3a5e'; // 稍暗的蓝色裤子，表示在后
-      ctx.strokeStyle = '#1a1a1a';
-      ctx.lineWidth = 1.5;
+      // 腿
       const lBack = ducking ? 0 : -run * 4;
-      ctx.fillRect(-4, -14 + lBack, 5, 14); ctx.strokeRect(-4, -14 + lBack, 5, 14);
-      ctx.fillStyle = '#4a3020';
-      ctx.fillRect(-5, -5 + lBack, 7, 5);
-
-      // 前腿（侧面，靠右）
-      ctx.fillStyle = '#1a1a2e';
-      ctx.strokeStyle = '#1a1a1a';
-      ctx.lineWidth = 2;
       const lFront = ducking ? 0 : run * 5;
-      ctx.fillRect(-1, -14 + lFront, 6, 14); ctx.strokeRect(-1, -14 + lFront, 6, 14);
-      ctx.fillStyle = '#654321';
-      ctx.fillRect(-2, -5 + lFront, 8, 5);
+      ctx.fillStyle = '#243b6b'; ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1.8;
+      ctx.fillRect(-5, -14 + lBack, 5, 14); ctx.strokeRect(-5, -14 + lBack, 5, 14);
+      ctx.fillStyle = '#1a2744';
+      ctx.fillRect(-2, -14 + lFront, 6, 14); ctx.strokeRect(-2, -14 + lFront, 6, 14);
+      ctx.fillStyle = '#c45c26';
+      ctx.fillRect(-6, -3 + lBack, 7, 4);
+      ctx.fillRect(-3, -3 + lFront, 8, 4);
 
-      // 蓝色上衣（侧面窄身，问天风格）
-      ctx.fillStyle = '#2d7dd2';
+      // 袍身
+      ctx.fillStyle = '#3b82f6';
       ctx.strokeStyle = '#1a1a1a';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.moveTo(-6, -14);
-      ctx.lineTo(-5, -44);
-      ctx.lineTo(6, -44);
-      ctx.lineTo(7, -14);
+      ctx.moveTo(-8, -12);
+      ctx.quadraticCurveTo(-9, -30, -7, -48);
+      ctx.lineTo(8, -48);
+      ctx.quadraticCurveTo(10, -30, 9, -12);
       ctx.closePath();
       ctx.fill(); ctx.stroke();
-
-      // 白色V领（侧面只看到一半）
-      ctx.fillStyle = '#fff';
+      // 胸口火焰纹
+      ctx.fillStyle = '#ffd93d';
       ctx.beginPath();
-      ctx.moveTo(-2, -44);
-      ctx.lineTo(1, -36);
-      ctx.lineTo(4, -44);
-      ctx.lineTo(2, -46);
-      ctx.lineTo(0, -46);
-      ctx.closePath();
-      ctx.fill(); ctx.stroke();
+      ctx.moveTo(0, -42); ctx.lineTo(4, -34); ctx.lineTo(0, -28); ctx.lineTo(-4, -34);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ff6b35';
+      ctx.beginPath();
+      ctx.moveTo(0, -40); ctx.lineTo(2.2, -34); ctx.lineTo(0, -30); ctx.lineTo(-2.2, -34);
+      ctx.closePath(); ctx.fill();
 
-      // 红色腰带（侧面窄）
-      ctx.fillStyle = '#e63946';
-      ctx.fillRect(-6, -22, 13, 4);
-      ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1;
-      ctx.strokeRect(-6, -22, 13, 4);
+      // 腰带
+      ctx.fillStyle = '#845ec2';
+      ctx.fillRect(-8, -20, 17, 5);
+      ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1.2;
+      ctx.strokeRect(-8, -20, 17, 5);
+      ctx.fillStyle = '#ffd93d';
+      ctx.beginPath(); ctx.arc(0, -17.5, 2.2, 0, Math.PI * 2); ctx.fill();
 
-      // 前臂（右侧，唯一可见的手臂，摆动+火球蓄力）
+      // 前臂 + 法球
       const aSwing = ducking ? 0 : Math.sin(animT * 10 + Math.PI) * 3;
-      ctx.fillStyle = '#2d7dd2'; ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2;
-      ctx.fillRect(4, -40 + aSwing, 5, 14); ctx.strokeRect(4, -40 + aSwing, 5, 14);
-      // 手
-      ctx.fillStyle = '#f4c2a1';
-      ctx.beginPath(); ctx.arc(6.5, -26 + aSwing, 3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      // 火球蓄力光效
-      if (atkCd < 0.08) {
-        const og = 0.5 + 0.3 * Math.sin(animT * 8);
-        ctx.fillStyle = `rgba(255,107,53,${og})`;
-        ctx.beginPath(); ctx.arc(6.5, -26 + aSwing, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3b82f6'; ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2;
+      ctx.fillRect(5, -42 + aSwing, 5, 15); ctx.strokeRect(5, -42 + aSwing, 5, 15);
+      ctx.fillStyle = '#f6c7a5';
+      ctx.beginPath(); ctx.arc(7.5, -26 + aSwing, 3.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      {
+        const pulse = 0.45 + 0.25 * Math.sin(animT * 7);
+        ctx.fillStyle = `rgba(255,140,40,${pulse})`;
+        ctx.beginPath(); ctx.arc(14, -28 + aSwing, 7, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#ffd93d';
-        ctx.beginPath(); ctx.arc(6.5, -26 + aSwing, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(14, -28 + aSwing, 3.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff8e7';
+        ctx.beginPath(); ctx.arc(14, -28 + aSwing, 1.6, 0, Math.PI * 2); ctx.fill();
       }
 
-      // 头部（侧脸朝右，偏右 positioning）
-      ctx.fillStyle = '#f4c2a1'; ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(1, -52, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-
-      // 鼻子（右侧凸出）
-      ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1.5;
+      // 头
+      ctx.fillStyle = '#f6c7a5'; ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(1, -56, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      // 尖帽
+      ctx.fillStyle = '#2d7dd2';
       ctx.beginPath();
-      ctx.moveTo(8, -52);
-      ctx.lineTo(10, -51);
-      ctx.lineTo(8, -49);
-      ctx.stroke();
-
-      // 绿色眼睛（右侧，问天标志）
-      ctx.fillStyle = '#2ecc71';
-      ctx.beginPath();
-      ctx.arc(4, -53, 2.2, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(-10, -58); ctx.lineTo(1, -78); ctx.lineTo(12, -58);
+      ctx.quadraticCurveTo(1, -62, -10, -58);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ff6b35';
+      ctx.beginPath(); ctx.arc(1, -78, 2.5, 0, Math.PI * 2); ctx.fill();
+      // 眼
+      ctx.fillStyle = '#1a1a1a';
+      ctx.beginPath(); ctx.arc(4, -56, 1.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(4.4, -56.4, 0.5, 0, Math.PI * 2); ctx.fill();
+      // 笑
+      ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(5, -52, 2.5, 0.15, Math.PI - 0.15); ctx.stroke();
+      // 发丝
       ctx.fillStyle = '#1a1a1a';
       ctx.beginPath();
-      ctx.arc(4.5, -53, 1, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 嘴巴（侧面短线）
-      ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(5, -48);
-      ctx.lineTo(8, -48);
-      ctx.stroke();
-
-      // 黑色头发（侧脸朝右，头发向后左飘）
-      ctx.fillStyle = '#1a1a1a';
-      ctx.strokeStyle = '#0a0a0a';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(1, -55, 8.5, Math.PI * 0.75, Math.PI * 2.05);
-      // 后脑勺头发向左刺出
-      ctx.lineTo(-4, -58);
-      ctx.lineTo(-10, -64);
-      ctx.lineTo(-6, -60);
-      ctx.lineTo(-4, -68);
-      ctx.lineTo(-1, -62);
-      ctx.lineTo(2, -68);
-      ctx.lineTo(4, -62);
-      ctx.lineTo(7, -66);
-      ctx.lineTo(5, -58);
-      ctx.closePath();
-      ctx.fill(); ctx.stroke();
-
-      // 额前碎发（向右飘）
-      ctx.fillStyle = '#1a1a1a';
-      ctx.beginPath();
-      ctx.moveTo(3, -56);
-      ctx.lineTo(6, -50);
-      ctx.lineTo(8, -52);
-      ctx.closePath();
-      ctx.fill();
+      ctx.moveTo(-6, -60); ctx.lineTo(-12, -68); ctx.lineTo(-4, -62);
+      ctx.lineTo(-2, -70); ctx.lineTo(2, -62); ctx.lineTo(6, -69); ctx.lineTo(8, -60);
+      ctx.closePath(); ctx.fill();
 
       ctx.restore();
       ctx.globalAlpha = 1;
