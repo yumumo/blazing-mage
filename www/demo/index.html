@@ -686,7 +686,7 @@
           <button id="up-fb">升级</button>
         </div>
         <div class="upgrade">
-          <div class="meta"><div class="name">护盾</div><div class="desc">上限 1 个，破碎时触发天空冲刺 300 米</div></div>
+          <div class="meta"><div class="name">护盾</div><div class="desc">上限 1 个，破碎时触发起飞约 300 米</div></div>
           <div class="lv" id="lv-shd"></div>
           <button id="up-shd">升级</button>
         </div>
@@ -711,7 +711,7 @@
         </div>
         <div class="shop-card" id="shop-card-shield">
           <div class="icon-big">🛡</div>
-          <div class="meta"><div class="name">护盾</div><div class="desc">获得1层临时护盾，抵挡1次伤害</div><div class="owned">拥有 <span id="shop-owned-shield">0</span></div></div>
+          <div class="meta"><div class="name">护盾</div><div class="desc">获得1层充能，受致命伤或掉坑时触发起飞</div><div class="owned">拥有 <span id="shop-owned-shield">0</span></div></div>
           <button id="buy-shield">购买 150 金</button>
         </div>
         <div class="shop-card" id="shop-card-double">
@@ -987,10 +987,10 @@
     const fbSpeed = () => FB_SPEED * (1 + (lvFb - 1) * 0.15);  // 火球速度随等级提升
     const energyRegen = () => ENERGY_REGEN * (1 + (lvEnergy - 1) * 0.2); // 回能速度随等级提升，每级+20%
 
-    // 天空冲刺（护盾破碎触发）
+    // 起飞（原天空冲刺：永久护盾破碎 / 护盾道具充能救场 / 地图起飞道具）
     const SKY_SPRINT_DUR = 3.0;       // 总时长 3 秒
     const SKY_SPRINT_FADE = 0.5;      // 淡入淡出时长
-    const SKY_SPRINT_H = 320;         // 天空飞行高度
+    const SKY_SPRINT_H = 320;         // 起飞高度
     const SKY_SPRINT_SPEED_MAX = 2800; // 最大速度 px/s（3秒内覆盖约300m）
 
     // 新手教程：提示可早出现；时停延后到障碍靠近后再触发（单次跳/滚即可过）
@@ -1001,7 +1001,7 @@
       { m: 110, type: 'beam',    title: '翻滚穿越', text: '靠近横梁时按 S 翻滚穿过！', action: 'duck', freezeAt: 95 },
       { m: 165, type: 'gap',     title: '跨越坑洞', text: '靠近坑边按 W 跳过去！', action: 'jump', freezeAt: 105 },
       { m: 220, type: 'monster', title: '火球攻击', text: '按 J 发射火球击败怪物！', action: 'attack', freezeAt: 160 },
-      { m: 270, type: 'info',    title: '受伤机制', text: '碰障碍扣血，护盾可抵挡一次并触发天空冲刺', wait: 3 },
+      { m: 270, type: 'info',    title: '受伤机制', text: '碰障碍扣血；永久护盾破碎、护盾道具救场都会触发起飞', wait: 3 },
       { m: 320, type: 'coins',   title: '收集金币', text: '收集金币获得额外奖励！', action: 'coin', freeze: false },
       { m: 370, type: 'info',    title: '速度提升', text: '距离越远速度越快，做好准备！', wait: 2.5 },
       { m: 410, type: 'info',    title: '教程完成', text: '祝你好运，开始冒险吧！', wait: 2.5 },
@@ -1073,7 +1073,7 @@
     // ===================== 道具定义 =====================
     const ITEMS = {
       magnet: { name: '磁铁', desc: '10秒内吸引附近金币', price: 100, dur: 10, icon: '🧲' },
-      shield: { name: '护盾', desc: '获得1层临时护盾，抵挡1次伤害', price: 150, dur: 0, icon: '🛡' },
+      shield: { name: '护盾', desc: '获得1层充能，受致命伤或掉坑时触发起飞', price: 150, dur: 0, icon: '🛡' },
       double: { name: '双倍金币', desc: '本局金币拾取翻倍', price: 250, dur: 0, icon: '💰' },
       revive: { name: '复活币', desc: '死亡后原地复活，恢复满血', price: 400, dur: 0, icon: '❤' },
     };
@@ -1089,9 +1089,9 @@
       magnet: { color: '#845ec2', glow: '#b39ddb', dur: 10, name: '磁铁' },
       double: { color: '#ffd93d', glow: '#fff3c4', dur: 15, name: '双倍金币' },
       attack: { color: '#ff6b35', glow: '#ffb088', dur: 10, name: '攻击强化' },
-      fly:    { color: '#00c9a7', glow: '#7fefde', dur: 5,  name: '起飞' },
+      fly:    { color: '#00c9a7', glow: '#7fefde', dur: 0,  name: '起飞' }, // 拾取即触发起飞
     };
-    const PU_KEYS = ['magnet', 'double', 'attack', 'fly'];
+    const PU_KEYS = ['magnet', 'double', 'attack']; // fly 拾取即起飞，不走计时器
     const PU_SPAWN_INTERVAL = 333;  // 每 ~333m 刷一个（≈3个/1000m）
     const PU_R = 16;               // 道具拾取半径
 
@@ -1119,7 +1119,7 @@
     let coinPickups = 0;         // 本局拾取金币数
     let powerups = [];           // 局内道具实体 {x, y, type, phase}
     let puSpawnNextM = 350;      // 下个道具刷新距离（m，教程结束后开始）
-    let puTimers = { magnet: 0, double: 0, attack: 0, fly: 0 }; // 道具效果计时器
+    let puTimers = { magnet: 0, double: 0, attack: 0 }; // 道具效果计时器
 
     let best = load(LS.best, 0);
     let bestScore = load(LS.score, 0);
@@ -1133,7 +1133,7 @@
     let tutorialDone = load(LS.tut, 0);
     let hp = 1;
     let shield = 0;
-    // 道具护盾标记（被击破时不触发天空冲刺，仅消失）
+    // 护盾道具充能：仅在致命伤 / 掉坑时消耗并触发起飞
     let itemShield = 0;
 
     // ===================== 奖励空间（传送门）状态 =====================
@@ -1152,10 +1152,10 @@
     let itemTimers = { magnet: 0 };
     let equippedItems = { magnet: false, shield: false, double: false, revive: false };
 
-    // 天空冲刺状态
-    let skySprintTime = 0;         // 天空冲刺已用时间 (s)
+    // 起飞状态（内部仍用 skySprint* 变量名）
+    let skySprintTime = 0;         // 起飞已用时间 (s)
     let skySprintActive = false;
-    // 天空冲刺速度倍率（淡入→满速→淡出）
+    // 起飞速度倍率（淡入→满速→淡出）
     const skySprintMul = () => {
       if (!skySprintActive) return 0;
       const t = skySprintTime;
@@ -1190,7 +1190,6 @@
     let featureCooldown = 0;      // 障碍物冷却（连续段路面无障碍）
     let duckObsCd = 0;            // 蹲伏类障碍冷却（防止连续横梁/飞行物）
     let jumpObsCd = 0;            // 跳跃类障碍冷却（防止连续墙壁/怪物）
-    let wasFlyActive = false;     // 上一帧是否在起飞状态（检测落地时刻）
     let platformAfterGap = 0;     // 距上次坑过了几段路面
     let animT = 0;
     let lastTs = 0;
@@ -1270,12 +1269,46 @@
     }
 
     // 在 [availStart, availEnd] 范围内尝试放置实体，最多 6 次随机尝试
+    // make(x) 可返回 false 表示该点业务拒绝（如跳/蹲冲突），将继续尝试
     function tryPlace(make, availStart, availEnd, w) {
       if (availEnd - availStart < w) return false;
       for (let t = 0; t < 6; t++) {
         const x = availStart + Math.random() * (availEnd - availStart - w);
-        if (isRangeFree(x, w)) { make(x); return true; }
+        if (!isRangeFree(x, w)) continue;
+        if (make(x) === false) continue;
+        return true;
       }
+      return false;
+    }
+
+    // 跳跃类 ↔ 蹲伏类：段冷却交叉 + 像素间距，避免「刚跳完立刻蹲 / 刚蹲完立刻跳」
+    // 段冷却取 2：既防连招，又不把前期内容下限压得过空
+    const ACTION_SEG_CD = 2;
+    const ACTION_SEP_PX = 260;
+    function markJumpAction() {
+      jumpObsCd = Math.max(jumpObsCd, ACTION_SEG_CD);
+      duckObsCd = Math.max(duckObsCd, ACTION_SEG_CD);
+    }
+    function markDuckAction() {
+      duckObsCd = Math.max(duckObsCd, ACTION_SEG_CD);
+      jumpObsCd = Math.max(jumpObsCd, ACTION_SEG_CD);
+    }
+    function nearJumpHazards(cx, cw, pad) {
+      pad = pad ?? ACTION_SEP_PX;
+      for (const w of walls) if (cx < w.x + w.w + pad && cx + cw + pad > w.x) return true;
+      for (const s of spikes) if (cx < s.x + s.w + pad && cx + cw + pad > s.x) return true;
+      for (const m of monsters) {
+        const mw = m.big ? 46 : 28;
+        if (cx < m.x + mw + pad && cx + cw + pad > m.x) return true;
+      }
+      for (const p of elevatedPlatforms) if (cx < p.x1 + pad && cx + cw + pad > p.x0) return true;
+      for (const g of gaps) if (cx < g.x + g.w + pad && cx + cw + pad > g.x) return true;
+      return false;
+    }
+    function nearDuckHazards(cx, cw, pad) {
+      pad = pad ?? ACTION_SEP_PX;
+      for (const b of beams) if (cx < b.x + b.w + pad && cx + cw + pad > b.x) return true;
+      for (const f of flyers) if (cx < f.x + f.w + pad && cx + cw + pad > f.x) return true;
       return false;
     }
 
@@ -1325,7 +1358,7 @@
           }
         }
         // 奖励空间内道具刷新更频繁（每150-250m）
-        puSpawnNextM = distanceM() + (bonusActive ? 150 + Math.random() * 100 : 200 + Math.random() * 200);
+        puSpawnNextM = distanceM() + (bonusActive ? 150 + Math.random() * 100 : 120 + Math.random() * 140);
       }
 
       // 奖励空间：只生成金币，无障碍无怪物
@@ -1365,11 +1398,10 @@
 
       const d = distanceM();
 
-      // 障碍物密度：随距离递增，上限在 300m+
-      // 0-80m: cd=1（轻度冷却）, 80m+: cd=0（密集，上限）
-      const obsCd = d < 80 ? 1 : 0;
-      // 障碍物生成概率：随距离从 0.65 提升到 0.75
-      const obsChance = Math.min(0.75, 0.65 + d / 1200);
+      // 障碍密度：前期就有像样下限，再随距离缓增
+      // 0-60m 偶发空段；60m+ 每段可尝试生成
+      const obsCd = d < 60 ? 1 : 0;
+      const obsChance = Math.min(0.88, 0.78 + d / 2000);
 
       // ---- 障碍物生成（受冷却限制）----
       // 蹲伏/跳跃冷却每段递减（独立于 featureCooldown，修复 500m+ obsCd=0 时永不递减的 bug）
@@ -1382,7 +1414,7 @@
         featureCooldown--;
       } else {
         const m = x1 - x0;
-        if (m >= 140) {
+        if (m >= 120) {
           const availStart = x0 + OBSTACLE_MARGIN;
           const availEnd = x1 - OBSTACLE_MARGIN;
           if (availEnd > availStart) {
@@ -1390,44 +1422,61 @@
             if (roll > obsChance) { featureCooldown = obsCd; return; } // 本次不生成
             // 蹲伏类冷却中时，横梁和飞行物概率归零
             const beamOk = duckObsCd <= 0;
-            const flyerOk = duckObsCd <= 0 && d > 150;
+            const flyerOk = duckObsCd <= 0 && d > 90;
             // 跳跃类冷却中时，墙壁、怪物和地刺概率归零
             const wallOk = jumpObsCd <= 0;
             const monsterOk = jumpObsCd <= 0;
             const spikeOk = jumpObsCd <= 0;
-            const spikeChance = (d > 80 && spikeOk) ? 0.10 : 0;
-            const flyerChance = flyerOk ? 0.08 : 0;
-            const beamChance = beamOk ? 0.14 : 0;
-            const wallChance = wallOk ? 0.13 : 0;
-            const monsterChance = monsterOk ? 0.14 : 0;
+            // 前期权重偏墙/怪/梁，保证「有东西可操作」；后期再掺刺与飞物
+            const spikeChance = (d > 50 && spikeOk) ? 0.10 : 0;
+            const flyerChance = flyerOk ? 0.09 : 0;
+            const beamChance = beamOk ? 0.16 : 0;
+            const wallChance = wallOk ? 0.16 : 0;
+            const monsterChance = monsterOk ? 0.20 : 0;
             const total = wallChance + beamChance + monsterChance + spikeChance + flyerChance;
             const r2 = roll / obsChance * total;
             if (r2 < wallChance) {
-              tryPlace((x) => walls.push({ x, w: 36 }), availStart, availEnd, 36);
-              jumpObsCd = 3; // 生成墙壁后冷却3段（保证2段无跳跃障碍）
+              tryPlace((x) => {
+                if (nearDuckHazards(x, 36)) return false;
+                walls.push({ x, w: 36 });
+                markJumpAction();
+              }, availStart, availEnd, 36);
             } else if (r2 < wallChance + beamChance) {
               const bw = 100 + Math.random() * 50;
-              tryPlace((x) => beams.push({ x, w: bw }), availStart, availEnd, bw);
-              duckObsCd = 3; // 生成横梁后冷却3段（保证2段无蹲伏障碍）
+              tryPlace((x) => {
+                if (nearJumpHazards(x, bw)) return false;
+                beams.push({ x, w: bw });
+                markDuckAction();
+              }, availStart, availEnd, bw);
             } else if (r2 < wallChance + beamChance + monsterChance) {
-              const big = Math.random() < 0.3;
+              const big = Math.random() < (d > 250 ? 0.3 : 0.18);
               const mw = big ? 46 : 28;
-              tryPlace((x) => monsters.push({ x, big, hp: big ? 2 : 1, phase: Math.random() * 6.28 }), availStart, availEnd, mw);
-              jumpObsCd = 3; // 生成怪物后冷却3段（保证2段无跳跃障碍）
+              tryPlace((x) => {
+                if (nearDuckHazards(x, mw)) return false;
+                monsters.push({ x, big, hp: big ? 2 : 1, phase: Math.random() * 6.28 });
+                markJumpAction();
+              }, availStart, availEnd, mw);
             } else if (r2 < wallChance + beamChance + monsterChance + spikeChance) {
-              tryPlace((x) => spikes.push({ x, w: SPIKE_W }), availStart, availEnd, SPIKE_W);
-              jumpObsCd = 3; // 地刺也需要跳跃，冷却3段
+              tryPlace((x) => {
+                if (nearDuckHazards(x, SPIKE_W)) return false;
+                spikes.push({ x, w: SPIKE_W });
+                markJumpAction();
+              }, availStart, availEnd, SPIKE_W);
             } else if (r2 < total) {
-              tryPlace((x) => flyers.push({ x, baseY: FLYER_BASE_Y, phase: Math.random() * 6.28, w: FLYER_W }), availStart, availEnd, FLYER_W);
-              duckObsCd = 3; // 生成飞行物后冷却3段（保证2段无蹲伏障碍）
+              tryPlace((x) => {
+                if (nearJumpHazards(x, FLYER_W)) return false;
+                flyers.push({ x, baseY: FLYER_BASE_Y, phase: Math.random() * 6.28, w: FLYER_W });
+                markDuckAction();
+              }, availStart, availEnd, FLYER_W);
             }
             featureCooldown = obsCd;
           }
         }
       }
 
-      // ---- 金币生成（不受障碍冷却限制）----
-      if (Math.random() < 0.40) {
+      // ---- 金币生成（前期更高，随距离略降但仍高于旧 0.40）----
+      const coinChance = d < 200 ? 0.62 : Math.max(0.50, 0.62 - (d - 200) / 2500);
+      if (Math.random() < coinChance) {
         const span = (x1 - x0) - 2 * OBSTACLE_MARGIN;
         if (span >= 80) {
           // 安全检查：x 轴间距 + 横梁 y 轴避让
@@ -1538,8 +1587,9 @@
         return;
       }
 
-      const gapChance = Math.min(0.22, 0.13 + d / 12000);
-      const isGap = gapCooldown <= 0 && Math.random() < gapChance;
+      const gapChance = Math.min(0.26, 0.16 + d / 10000);
+      // 刚蹲完（横梁/飞物）后禁止立刻出坑，避免落地就必须再跳
+      const isGap = gapCooldown <= 0 && jumpObsCd <= 0 && duckObsCd <= 0 && Math.random() < gapChance;
       if (isGap) {
         // 后期坑洞加宽：300m 开始渐增，600m 后达到 130-180px
         let w;
@@ -1557,6 +1607,7 @@
         genX += w;
         gapCooldown = GAP_COOLDOWN;
         platformAfterGap = 0;
+        markJumpAction();
         return;
       }
 
@@ -1572,15 +1623,15 @@
       spawnFeature(genX, genX + len, platformAfterGap === 0);
       genX += len;
 
-      // 高台平台生成（200m 后，坑后第 2+ 段路面，跳跃冷却结束，坑洞安全区外）
-      if (d > 200 && platformAfterGap >= 2 && jumpObsCd <= 0 && gapCooldown > 1 && Math.random() < 0.18) {
+      // 高台：需跳跃；且不得紧贴横梁/飞物（否则跳上高台后立刻要蹲）
+      if (d > 120 && platformAfterGap >= 2 && jumpObsCd <= 0 && duckObsCd <= 0 && gapCooldown > 1 && Math.random() < 0.20) {
         const pw = PLATFORM_W_MIN + Math.random() * (PLATFORM_W_MAX - PLATFORM_W_MIN);
         const segStart = genX - len;
         for (let t = 0; t < 6; t++) {
           const px0 = segStart + OBSTACLE_MARGIN + Math.random() * Math.max(1, len - pw - 2 * OBSTACLE_MARGIN);
-          if (isRangeFree(px0, pw)) {
+          if (isRangeFree(px0, pw) && !nearDuckHazards(px0, pw)) {
             elevatedPlatforms.push({ x0: px0, x1: px0 + pw, y: PLATFORM_H });
-            jumpObsCd = 3; // 高台需要跳跃上去，冷却3段
+            markJumpAction();
             break;
           }
         }
@@ -1645,8 +1696,7 @@
       energy = ENERGY_MAX; canDoubleJump = false;
       lastMilestone = 0; milestoneFx = 0; milestoneText = '';
       coinPickups = 0; featureCooldown = 0; duckObsCd = 0; jumpObsCd = 0; platformAfterGap = 0;
-      wasFlyActive = false;
-      powerups = []; puSpawnNextM = tutorialActive ? 350 : 150; puTimers = { magnet: 0, double: 0, attack: 0, fly: 0 };
+      powerups = []; puSpawnNextM = tutorialActive ? 280 : 80; puTimers = { magnet: 0, double: 0, attack: 0 };
       onPlatformY = 0;
       skySprintTime = 0; skySprintActive = false;
       tutorialActive = !tutorialDone;
@@ -1753,23 +1803,22 @@
 
     function hurtPlayer(dmg) {
       if (invincible > 0 || skySprintActive) return;
-      // 道具护盾优先消耗（不触发天空冲刺，仅消失）
-      if (itemShield > 0) {
-        itemShield--;
-        invincible = 1.0;
-        sfxHurt();
-        floats.push({ x: CHAR_X, y: GROUND - 100, t: 0.8, text: '护盾!' });
-        return;
-      }
+      // 永久护盾：任意命中破碎 → 起飞
       if (shield > 0) {
         shield--;
         triggerSkySprint();
-      } else {
-        hp = Math.max(0, hp - dmg);
-        invincible = 1.2;
-        sfxHurt();
-        if (hp <= 0) gameOver();
+        return;
       }
+      // 护盾道具：仅致命伤时消耗充能 → 起飞
+      if (itemShield > 0 && hp - dmg <= 0) {
+        itemShield--;
+        triggerSkySprint();
+        return;
+      }
+      hp = Math.max(0, hp - dmg);
+      invincible = 1.2;
+      sfxHurt();
+      if (hp <= 0) gameOver();
     }
 
     function triggerSkySprint() {
@@ -1780,16 +1829,14 @@
       vy = 0;
       ducking = false;
       sfxSprint();
-      floats.push({ x: CHAR_X, y: GROUND - 260, t: 1.5, shield: true, text: '天空冲刺!' });
+      floats.push({ x: CHAR_X, y: GROUND - 260, t: 1.5, shield: true, text: '起飞!' });
     }
 
     function escapePit() {
       if (window.testCheat) { px = 0; vy = 0; return; }
       if (itemShield > 0) {
         itemShield--;
-        invincible = 1.0;
-        px = 0; vy = 0;
-        floats.push({ x: CHAR_X, y: GROUND - 100, t: 0.8, text: '护盾!' });
+        triggerSkySprint();
       } else if (shield > 0) {
         shield--;
         triggerSkySprint();
@@ -2006,13 +2053,6 @@
           // 着陆安全区：30m（780px）内无障碍无怪物
           clearAhead(CHAR_X + 780, { featureCd: 4, gapCd: 4 });
         }
-      } else if (puTimers.fly > 0) {
-        // 起飞道具：角色悬浮高空，免疫一切障碍
-        px = 200;
-        vy = 0;
-        ducking = false; rollTimer = 0;
-        // 着陆缓冲：飞行即将结束时给予短暂无敌
-        if (puTimers.fly < 0.3) invincible = Math.max(invincible, 1.0);
       } else {
         // 翻滚触发：单次按下，地面时启动
         if (duckPressed && px <= 0.5 + onPlatformY) triggerRoll();
@@ -2086,17 +2126,10 @@
       jumpPressed = false;
       duckPressed = false;
 
-      // 起飞道具落地安全区：检测从飞行到落地的瞬间，清除前方10m内障碍
-      if (wasFlyActive && puTimers.fly <= 0 && !skySprintActive) {
-        clearAhead(CHAR_X + 260, { featureCd: 3, gapCd: 3 });
-        invincible = Math.max(invincible, 1.0);
-      }
-      wasFlyActive = puTimers.fly > 0;
-
       const chH = ducking ? CHAR_H_DUCK : CHAR_H_STAND;
 
-      // 掉坑判定（阈值 -25，确保高速时能掉入坑洞；天空冲刺/起飞中跳过）
-      if (px < -25 && !skySprintActive && puTimers.fly <= 0) {
+      // 掉坑判定（阈值 -25，确保高速时能掉入坑洞；起飞中跳过）
+      if (px < -25 && !skySprintActive) {
         escapePit();
         if (!running) return;
       }
@@ -2159,8 +2192,8 @@
         if (hit) fireballs.splice(i, 1);
       }
 
-      // 碰撞（天空冲刺/起飞中免疫）
-      if (!skySprintActive && puTimers.fly <= 0) {
+      // 碰撞（起飞中免疫）
+      if (!skySprintActive) {
         for (const wE of walls) {
           const wh = wallH(wE);
           const wb = { x: wE.x, y: GROUND - wh, w: wE.w, h: wh };
@@ -2198,9 +2231,9 @@
       }
 
       // 金币拾取
-      // 天空冲刺和起飞时自动附带磁铁效果（飞行中无法正常拾取金币）
-      const magnetActive = itemTimers.magnet > 0 || puTimers.magnet > 0 || skySprintActive || puTimers.fly > 0;
-      const flying = puTimers.fly > 0 || skySprintActive;
+      // 起飞时自动附带磁铁效果（高空无法正常拾取）
+      const magnetActive = itemTimers.magnet > 0 || puTimers.magnet > 0 || skySprintActive;
+      const flying = skySprintActive;
       // 飞行时角色在高空(y≈240/120)，金币在地面(y≈360-440)，垂直差距大
       // 需要大幅扩大吸引范围和拉力速度，确保高速滚动时也能吸上来
       const magnetRange = flying ? 400 : 140;
@@ -2210,7 +2243,7 @@
       const cy = GROUND - px - U;
       for (const c of coins) {
         if (c.taken) continue;
-        // 天空冲刺速度极快(2800px/s)，磁铁吸不动，直接收集屏幕内所有金币
+        // 起飞速度极快(2800px/s)，磁铁吸不动，直接收集屏幕内所有金币
         if (skySprintActive && c.x > -20 && c.x < W + 20) {
           c.taken = true;
           if (activeItems.double || puTimers.double > 0) { coinPickups += 2; floats.push({ x: c.x, y: c.y - 10, t: 0.6, text: `+${COIN_VALUE * 2}` }); }
@@ -2245,10 +2278,17 @@
         const dx = p.x - cx;
         const dy = p.y - cy;
         if (dx * dx + dy * dy < 40 * 40) {
-          puTimers[p.type] = PU[p.type].dur;
-          sfxCoin();
-          floats.push({ x: p.x, y: p.y - 10, t: 0.8, text: PU[p.type].name + '!' });
-          powerups.splice(i, 1);
+          if (p.type === 'fly') {
+            sfxCoin();
+            floats.push({ x: p.x, y: p.y - 10, t: 0.8, text: '起飞!' });
+            powerups.splice(i, 1);
+            triggerSkySprint();
+          } else {
+            puTimers[p.type] = PU[p.type].dur;
+            sfxCoin();
+            floats.push({ x: p.x, y: p.y - 10, t: 0.8, text: PU[p.type].name + '!' });
+            powerups.splice(i, 1);
+          }
         }
       }
 
@@ -2876,7 +2916,7 @@
       const hMul = ducking ? 0.52 : 1;
       const run = Math.sin(animT * 9);
 
-      if (puTimers.magnet > 0 || itemTimers.magnet > 0 || skySprintActive || puTimers.fly > 0) {
+      if (puTimers.magnet > 0 || itemTimers.magnet > 0 || skySprintActive) {
         ctx.fillStyle = 'rgba(132,94,194,0.15)';
         ctx.beginPath(); ctx.arc(cx, cy - 32 + bob, 48 + Math.sin(animT * 5) * 4, 0, Math.PI * 2); ctx.fill();
       }
@@ -2888,8 +2928,8 @@
         ctx.fillStyle = `rgba(255,107,53,${0.12 + Math.sin(animT * 8) * 0.06})`;
         ctx.beginPath(); ctx.arc(cx, cy - 32 + bob, 42, 0, Math.PI * 2); ctx.fill();
       }
-      if (puTimers.fly > 0) {
-        ctx.fillStyle = 'rgba(0,201,167,0.25)';
+      if (itemShield > 0) {
+        ctx.fillStyle = 'rgba(132,94,194,0.2)';
         for (let i = 0; i < 5; i++) {
           const a = animT * 2.8 + i * 1.25;
           ctx.beginPath();
@@ -3177,7 +3217,7 @@
       if (!skySprintActive) return;
       const mul = skySprintMul(); // 0.3→1→0.3，用于淡入淡出
       const alpha = Math.max(0.15, mul); // 视觉alpha跟随速度倍率
-      // 天空冲刺速度线（密集，alpha淡入淡出）
+      // 起飞速度线（密集，alpha淡入淡出）
       ctx.strokeStyle = `rgba(255,217,61,${0.5 * alpha})`;
       ctx.lineWidth = 2;
       for (let i = 0; i < 16; i++) {
@@ -3189,19 +3229,19 @@
         ctx.lineTo(W - off + ll, yy - 6);
         ctx.stroke();
       }
-      // 冲刺距离指示
+      // 起飞距离指示
       ctx.fillStyle = `rgba(0,0,0,${0.6 * alpha})`;
       ctx.fillRect(W / 2 - 100, 14, 200, 36);
       ctx.fillStyle = `rgba(255,217,61,${alpha})`;
       ctx.font = 'bold 14px system-ui, sans-serif';
       ctx.textAlign = 'center';
       const remain = Math.max(0, SKY_SPRINT_DUR - skySprintTime);
-      ctx.fillText(`天空冲刺 ${remain.toFixed(1)}s`, W / 2, 31);
+      ctx.fillText(`起飞 ${remain.toFixed(1)}s`, W / 2, 31);
       ctx.font = '10px system-ui, sans-serif';
       ctx.fillStyle = `rgba(255,243,196,${alpha})`;
-      ctx.fillText('护盾破碎 · 无敌冲刺中', W / 2, 45);
+      ctx.fillText('无敌冲刺中', W / 2, 45);
       ctx.textAlign = 'left';
-      // 冲刺进度条
+      // 起飞进度条
       const pct = skySprintTime / SKY_SPRINT_DUR;
       ctx.fillStyle = `rgba(0,0,0,${0.5 * alpha})`;
       ctx.fillRect(W / 2 - 80, 48, 160, 6);
@@ -3330,10 +3370,11 @@
       ctx.textAlign = 'left';
       // 奖励空间内激活道具提示
       const activeList = [];
-      if (puTimers.magnet > 0 || itemTimers.magnet > 0 || skySprintActive || puTimers.fly > 0) activeList.push('磁铁');
+      if (puTimers.magnet > 0 || itemTimers.magnet > 0 || skySprintActive) activeList.push('磁铁');
       if (puTimers.double > 0 || activeItems.double) activeList.push('双倍');
       if (puTimers.attack > 0) activeList.push('攻击强化');
-      if (puTimers.fly > 0) activeList.push('起飞');
+      if (skySprintActive) activeList.push('起飞');
+      if (itemShield > 0) activeList.push('护盾充能');
       if (activeList.length > 0) {
         ctx.fillStyle = 'rgba(0,0,0,0.4)';
         ctx.fillRect(W / 2 - 120, 50, 240, 20);
@@ -3373,7 +3414,7 @@
     }
 
     function drawItems() {
-      // 道具护盾指示
+      // 护盾道具充能指示（致命伤/掉坑触发起飞）
       if (itemShield > 0) {
         const sx = 14 + (lvShd > 0 ? lvShd * 26 : 0);
         const sy = 14 + 18 + 8;
@@ -3393,6 +3434,10 @@
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 9px system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('起飞充能', sx + 14, sy + 3);
         ctx.restore();
       }
       // 磁铁计时器
@@ -3451,7 +3496,7 @@
           ctx.fillStyle = '#fff';
           ctx.font = 'bold 11px system-ui, sans-serif';
           ctx.textAlign = 'left';
-          const label = k === 'magnet' ? '磁铁' : k === 'double' ? '双倍金币' : k === 'attack' ? '攻击强化' : '起飞';
+          const label = k === 'magnet' ? '磁铁' : k === 'double' ? '双倍金币' : '攻击强化';
           ctx.fillText(label, 14, puY + 11);
           ctx.fillStyle = def.glow;
           ctx.font = 'bold 11px system-ui, sans-serif';
@@ -3824,7 +3869,7 @@
         itemShield++;
         ownedItems.shield--;
         saveItems(ownedItems);
-        floats.push({ x: CHAR_X, y: GROUND - 120, t: 1.0, text: '护盾!' });
+        floats.push({ x: CHAR_X, y: GROUND - 120, t: 1.0, text: '护盾充能!' });
       } else if (key === 'double') {
         if (activeItems.double) return; // 已激活
         activeItems.double = true;
@@ -4080,7 +4125,9 @@
       activeItems,
       itemTimers: { magnet: +itemTimers.magnet.toFixed(1) },
       powerups: powerups.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y), type: p.type })),
-      puTimers: { magnet: +puTimers.magnet.toFixed(1), double: +puTimers.double.toFixed(1), attack: +puTimers.attack.toFixed(1), fly: +puTimers.fly.toFixed(1) },
+      puTimers: { magnet: +puTimers.magnet.toFixed(1), double: +puTimers.double.toFixed(1), attack: +puTimers.attack.toFixed(1) },
+      skySprintActive,
+      itemShield,
     });
 
     // ===================== 初始化 =====================
