@@ -1,3 +1,45 @@
+/* ========== boot loading ========== */
+.boot-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-content: center;
+  gap: 16px;
+  background: #12101a;
+  color: var(--moon, #faf6ec);
+  transition: opacity 0.28s ease, visibility 0.28s ease;
+}
+.boot-loading[hidden] {
+  display: none;
+}
+.boot-loading.is-done {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.boot-spinner {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 3px solid rgba(250, 246, 236, 0.18);
+  border-top-color: #f0d080;
+  animation: boot-spin 0.75s linear infinite;
+}
+.boot-loading-text {
+  margin: 0;
+  text-align: center;
+  font: 600 14px/1.4 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  letter-spacing: 0.06em;
+  color: rgba(250, 246, 236, 0.72);
+}
+@keyframes boot-spin {
+  to { transform: rotate(360deg); }
+}
+html.assets-pending .deco { display: none !important; }
+html.assets-pending .wrap { visibility: hidden; }
+
 /* ========== UI ========== */
 :root {
   color-scheme: dark;

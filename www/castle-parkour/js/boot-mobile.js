@@ -10,4 +10,5 @@
   window.__DEMO_DETECT_MOBILE_UI = detectMobileUi;
   window.__DEMO_MOBILE_UI = mobileUi;
   document.documentElement.classList.add(mobileUi ? 'mobile-ui' : 'desktop-ui');
+  document.documentElement.classList.add('assets-pending');
 })();

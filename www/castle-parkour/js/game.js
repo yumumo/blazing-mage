@@ -295,8 +295,8 @@ const SKY_SPRINT_SPEED_MAX = 2800; // 最大速度 px/s（3秒内覆盖约300m�
 // 新手教程：提示可早出现；时停延后到障碍靠近后再触发（单次跳/滚即可过）
 const TUTORIAL_END = 420;
 const TUTORIAL_STEPS = [
-  { m: 12,  type: 'info',    title: '基本操作', text: 'W/↑ 跳跃（空中可再跳）· S/↓ 翻滚 · J 攻击', wait: 2.8 },
-  { m: 55,  type: 'wall',    title: '跳跃躲避', text: '靠近火桩时按 W 跳过去！', action: 'jump', freezeAt: 100 },
+  { m: 12,  type: 'info',    title: '基本操作', text: 'W/↑/空格 跳跃 · S/↓ 翻滚 · J/鼠标左键 攻击', wait: 2.8 },
+  { m: 55,  type: 'wall',    title: '跳跃躲避', text: '靠近火桩时按 W 或空格跳过去！', action: 'jump', freezeAt: 100 },
   { m: 110, type: 'beam',    title: '翻滚穿越', text: '靠近横梁时按 S 翻滚穿过！', action: 'duck', freezeAt: 95 },
   { m: 165, type: 'gap',     title: '跨越坑洞', text: '靠近坑边按 W 跳过去！', action: 'jump', freezeAt: 105 },
   { m: 220, type: 'monster', title: '火球攻击', text: '按 J 发射火球击败怪物！', action: 'attack', freezeAt: 160 },
@@ -1090,6 +1090,7 @@ function spawnBonusFinale() {
 
 // ===================== 游戏控制 =====================
 function reset() {
+  if (!assetsReady) return;
   platforms = []; gaps = []; walls = []; beams = [];
   monsters = []; fireballs = []; floats = []; coins = [];
   elevatedPlatforms = []; spikes = []; flyers = []; bats = [];
@@ -1162,7 +1163,7 @@ function backToMenu() {
   stopBGM();
   homeBtn.style.display = 'none';
   startBtn.textContent = '开始游戏';
-  startBtn.disabled = false;
+  startBtn.disabled = !assetsReady;
   // 退出全屏（横版布局在重新进入游戏画面时由 applyMobileLayout 重新应用）
   if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
   document.getElementById('screen-game').classList.remove('game-landscape');
@@ -1709,7 +1710,7 @@ function update(dt) {
     if (duckPressed && px <= 0.5 + onPlatformY) triggerRoll();
     ducking = rollTimer > 0;
     if (ducking && tutorialShown && tutorialStep < TUTORIAL_STEPS.length && TUTORIAL_STEPS[tutorialStep].action === 'duck') tutorialActionDone = true;
-    const wantJump = keys.has('KeyW') || keys.has('ArrowUp');
+    const wantJump = keys.has('KeyW') || keys.has('ArrowUp') || keys.has('Space');
 
     // 检查是否还在高台上（走出了高台边缘就掉落）
     if (onPlatformY > 0) {
@@ -3217,18 +3218,7 @@ function drawPlayerRoll(cx, cy) {
   const charId = isWarrior() ? 'warrior' : 'mage';
   const pick = pickRollSheet(charId);
   if (pick && drawRollSheetSprite(cx, cy, pick)) return;
-  // 贴图未就绪时的兜底（不应常态出现）
-  ctx.save();
-  playerInvincibleFlicker(0.55);
-  ctx.translate(cx, cy - 14);
-  ctx.rotate(animT * 18);
-  const mid = isWarrior() ? '#8a9aaa' : '#e65100';
-  const inner = isWarrior() ? '#c4d0dc' : '#ffcc80';
-  artFillCircle(ctx, 0, 0, 20, isWarrior() ? 'rgba(120,140,160,0.35)' : 'rgba(255,140,60,0.28)');
-  artFillStrokeCircle(ctx, 0, 0, 15, mid, CHAR_INK, 2.5);
-  artFillCircle(ctx, 0, 0, 9, inner);
-  ctx.restore();
-  ctx.globalAlpha = 1;
+  // no geometric placeholder while sheet missing
 }
 
 function drawPlayerBuffAuras(cx, cy, bob) {
@@ -3882,10 +3872,18 @@ document.addEventListener('keydown', (e) => {
     toggleMute();
     return;
   }
-  if (e.code === 'Space' || e.code === 'Enter') {
+  if (e.code === 'Enter') {
     e.preventDefault();
     if (gameScreen.classList.contains('active') && !running) reset();
     return;
+  }
+  if (e.code === 'Space') {
+    e.preventDefault();
+    // 未开局 / 结束后：空格开始或重开；局内：当作跳跃
+    if (gameScreen.classList.contains('active') && !running) {
+      reset();
+      return;
+    }
   }
   // 数字键 1-4：道具装备（局前）/ 使用（局内）
   if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3' || e.code === 'Digit4') {
@@ -3897,9 +3895,9 @@ document.addEventListener('keydown', (e) => {
     }
     return;
   }
-  if (e.code === 'ArrowUp' || e.code === 'ArrowDown') e.preventDefault();
+  if (e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'Space') e.preventDefault();
   // 检测新跳跃按键（用于二段跳）
-  if ((e.code === 'KeyW' || e.code === 'ArrowUp') && !keys.has(e.code)) {
+  if ((e.code === 'KeyW' || e.code === 'ArrowUp' || e.code === 'Space') && !keys.has(e.code)) {
     jumpPressed = true;
   }
   // 检测新蹲伏按键（用于翻滚）
@@ -3935,6 +3933,15 @@ canvas.addEventListener('touchend', (e) => {
   keys.delete('KeyS');
   e.preventDefault();
 }, { passive: false });
+
+// PC：鼠标左键攻击（仅点在画布上，避免误触 UI）
+canvas.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  if (!gameScreen.classList.contains('active') || !running || over) return;
+  e.preventDefault();
+  attack();
+});
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // ===================== 屏幕按键控制 =====================
 function bindCtrlBtn(btnId, keyCode) {
@@ -4089,25 +4096,67 @@ function loadSpriteManifest() {
     .catch(() => {});
 }
 
+let assetsReady = false;
+let assetsPending = 0;
+let assetsFinished = 0;
+
+function setStartButtonsEnabled(on) {
+  for (const id of ['menu-start', 'start']) {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !on;
+  }
+}
+
+function finishBootLoading() {
+  if (assetsReady) return;
+  assetsReady = true;
+  document.documentElement.classList.remove('assets-pending');
+  document.documentElement.classList.add('assets-ready');
+  const boot = document.getElementById('boot-loading');
+  if (boot) {
+    boot.classList.add('is-done');
+    boot.setAttribute('aria-busy', 'false');
+    window.setTimeout(() => { boot.hidden = true; }, 300);
+  }
+  setStartButtonsEnabled(true);
+  refreshMainMenu();
+  if (document.getElementById('screen-char')?.classList.contains('active')) refreshCharScreen();
+}
+
+function noteAssetSettled() {
+  assetsFinished += 1;
+  const bootText = document.querySelector('.boot-loading-text');
+  if (bootText && assetsPending > 0) {
+    const pct = Math.min(100, Math.round((assetsFinished / assetsPending) * 100));
+    bootText.textContent = '加载中… ' + pct + '%';
+  }
+  if (assetsFinished >= assetsPending) finishBootLoading();
+}
+
+function trackImageAsset(a) {
+  assetsPending += 1;
+  loadImageAsset(a, () => {
+    noteAssetSettled();
+    if (!assetsReady) {
+      refreshMainMenu();
+      if (document.getElementById('screen-char')?.classList.contains('active')) refreshCharScreen();
+    }
+  });
+}
+
 function loadPortraitAssets() {
-  const refresh = () => {
-    refreshMainMenu();
-    if (document.getElementById('screen-char')?.classList.contains('active')) refreshCharScreen();
-  };
+  setStartButtonsEnabled(false);
+  assetsPending = 0;
+  assetsFinished = 0;
   loadSpriteManifest().finally(() => {
     for (const id of ['mage', 'warrior']) {
-      loadImageAsset(PORTRAIT_ASSETS[id], refresh);
-      for (const frame of Object.values(CHAR_SPRITES[id])) {
-        loadImageAsset(frame);
-      }
+      trackImageAsset(PORTRAIT_ASSETS[id]);
+      for (const frame of Object.values(CHAR_SPRITES[id])) trackImageAsset(frame);
+      trackImageAsset(CHAR_RUN_SHEETS[id]);
+      trackImageAsset(CHAR_ROLL_SHEETS[id]);
     }
-    for (const frame of Object.values(WORLD_ASSETS)) {
-      loadImageAsset(frame);
-    }
-    for (const id of ['mage', 'warrior']) {
-      loadImageAsset(CHAR_RUN_SHEETS[id]);
-      loadImageAsset(CHAR_ROLL_SHEETS[id]);
-    }
+    for (const frame of Object.values(WORLD_ASSETS)) trackImageAsset(frame);
+    if (assetsPending === 0) finishBootLoading();
   });
 }
 
@@ -4312,19 +4361,42 @@ function drawPortraitBg(pctx, w, h, charId) {
   pctx.fillRect(0, 0, w, h);
 }
 
+function drawCanvasSpinner(pctx, cx, cy, r) {
+  pctx.save();
+  pctx.translate(cx, cy);
+  pctx.rotate((performance.now() / 180) % (Math.PI * 2));
+  pctx.strokeStyle = 'rgba(250,246,236,0.18)';
+  pctx.lineWidth = 3;
+  pctx.beginPath();
+  pctx.arc(0, 0, r, 0, Math.PI * 2);
+  pctx.stroke();
+  pctx.strokeStyle = '#f0d080';
+  pctx.lineCap = 'round';
+  pctx.beginPath();
+  pctx.arc(0, 0, r, -Math.PI / 2, Math.PI * 0.4);
+  pctx.stroke();
+  pctx.restore();
+}
+
 function drawPortraitIllustration(pctx, charId, w, h) {
-  drawPortraitBg(pctx, w, h, charId);
   const asset = PORTRAIT_ASSETS[charId];
   if (asset?.ready && asset.img?.width) {
+    drawPortraitBg(pctx, w, h, charId);
     drawPortraitImage(pctx, asset, w, h);
     return;
   }
-  // 不再回退简陋矢量立绘（易被当成「旧版/显示 bug」）
-  pctx.fillStyle = 'rgba(250,246,236,0.55)';
-  pctx.font = '600 13px "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif';
-  pctx.textAlign = 'center';
-  pctx.textBaseline = 'middle';
-  pctx.fillText(asset?.failed ? '立绘未加载' : '立绘加载中…', w / 2, h * 0.46);
+  // loading / failed: plain fill + spinner — no geometric brick placeholder
+  pctx.fillStyle = '#1a1520';
+  pctx.fillRect(0, 0, w, h);
+  if (asset?.failed) {
+    pctx.fillStyle = 'rgba(250,246,236,0.55)';
+    pctx.font = '600 13px "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif';
+    pctx.textAlign = 'center';
+    pctx.textBaseline = 'middle';
+    pctx.fillText('立绘未加载', w / 2, h * 0.46);
+    return;
+  }
+  drawCanvasSpinner(pctx, w / 2, h * 0.46, Math.min(w, h) * 0.08);
 }
 
 function drawCharPortrait(charId, canvasId) {

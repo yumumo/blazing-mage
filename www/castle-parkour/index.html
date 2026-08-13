@@ -9,6 +9,11 @@
   <link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
+  <div id="boot-loading" class="boot-loading" aria-live="polite" aria-busy="true">
+    <div class="boot-spinner" aria-hidden="true"></div>
+    <p class="boot-loading-text">加载中…</p>
+  </div>
+
   <div class="deco d-circle"></div>
   <div class="deco d-semi"></div>
   <div class="deco d-tri"></div>
@@ -56,7 +61,7 @@
         <div class="chip best">最高<b id="best">0</b><small>m</small></div>
       </div>
       <div class="tips">
-        <kbd>W</kbd>/<kbd>↑</kbd> 跳跃（空中可二段跳） &nbsp;<kbd>S</kbd>/<kbd>↓</kbd> 翻滚 &nbsp;<kbd>J</kbd> 攻击（法师耗能量） &nbsp;<kbd>1-4</kbd> 道具 &nbsp;<kbd>空格</kbd>/按钮 开始 / 重开 &nbsp;<kbd>F</kbd> 全屏 &nbsp;<kbd>M</kbd> 静音 &nbsp;<kbd>P</kbd> 性能监控 &nbsp;<kbd>Esc</kbd> 返回
+        <kbd>W</kbd>/<kbd>↑</kbd>/<kbd>空格</kbd> 跳跃（空中可二段跳） &nbsp;<kbd>S</kbd>/<kbd>↓</kbd> 翻滚 &nbsp;<kbd>J</kbd>/鼠标左键 攻击（法师耗能量） &nbsp;<kbd>1-4</kbd> 道具 &nbsp;<kbd>空格</kbd>/回车/按钮 开始·重开 &nbsp;<kbd>F</kbd> 全屏 &nbsp;<kbd>M</kbd> 静音 &nbsp;<kbd>P</kbd> 性能监控 &nbsp;<kbd>Esc</kbd> 返回
       </div>
       <div class="item-equip" id="item-equip"></div>
       <div class="btn-row">
