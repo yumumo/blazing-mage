@@ -1,20 +1,33 @@
 # 古堡跑酷 · 开发文档
 
-`www/castle-parkour/index.html` 是单文件网页游戏，HTML/CSS/JS 全内联。默认角色、怪物、金币、道具、背景和 UI 由 Canvas 或 CSS 过程化绘制；可选 PNG 放在 `www/castle-parkour/assets/`。
+`www/castle-parkour/` 为静态网页游戏（HTML 壳 + `css/` + ES module `js/`）。默认逻辑在 Canvas；PNG 在 `assets/`。
 
 **AI 贴图**：主仓 skill `castle-parkour-art` + 规则 `.cursor/rules/castle-parkour-art.mdc`（品红底 → chroma key；勿在本 Core 内写规则副本）。
 
 ## 发布结构
 
-本仓对应 XRK-AGT Core 静态应用：`www/castle-parkour/`（挂载路径 `/castle-parkour`）。
+```text
+www/castle-parkour/
+  index.html
+  css/app.css
+  js/boot-mobile.js
+  js/main.js              # import ./game.js
+  js/game.js
+  js/config/characters.js # 角色扩展点
+  js/config/world.js      # 世界贴图扩展点
+  assets/
+  _headers
+```
 
-Cloudflare Pages（见根目录 `wrangler.toml`）：
+Cloudflare Pages（根目录 `wrangler.toml`）：
 
 ```text
 pages_build_output_dir = "www/castle-parkour"
 ```
 
-无构建命令；产物内为 `index.html`（及 `_headers`）。独立发布与 AGT 内挂载共用同一入口文件。
+无构建命令。独立发布与 AGT 挂载共用同一目录（挂载路径 `/castle-parkour`）。
+
+扩展说明见 `www/castle-parkour/js/README.md`。
 
 ## 核心数值
 

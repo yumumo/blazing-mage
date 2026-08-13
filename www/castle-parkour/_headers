@@ -1,7 +1,18 @@
-# 单页游戏：长期缓存 HTML 以外的静态资源（当前仅 index.html）
 /
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
 
 /index.html
-  Cache-Control: public, max-age=60, must-revalidate
+  Cache-Control: no-cache, must-revalidate
+
+/js/*
+  Cache-Control: no-cache, must-revalidate
+
+/css/*
+  Cache-Control: no-cache, must-revalidate
+
+/assets/*
+  Cache-Control: public, max-age=120, must-revalidate
+
+/assets/sprite-manifest.json
+  Cache-Control: no-cache, must-revalidate

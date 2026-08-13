@@ -36,4 +36,4 @@
 
 ## 技术说明
 
-本仓库为可独立发布的静态页游戏（Cloudflare Pages 产物为 `www/castle-parkour/`）。若嵌在 XRK-AGT 中，挂载路径为 `/castle-parkour`。
+本仓库为可独立发布的静态页游戏（Cloudflare Pages 产物为 `www/castle-parkour/`）。目录分区：`index.html` 壳 + `css/` + `js/`（`config/` 为角色/世界扩展点）+ `assets/`。若嵌在 XRK-AGT 中，挂载路径为 `/castle-parkour`。

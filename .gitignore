@@ -1,13 +1,32 @@
-﻿node_modules/
+﻿# deps / IDE / OS
+node_modules/
 .DS_Store
 Thumbs.db
 desktop.ini
 *.log
 .vscode/
 .idea/
+
+# local / smoke / deploy caches
 _smoke_*
 progress.md
 .wrangler/
 dist/
+__pycache__/
+*.pyc
+*.pyo
+
+# art pipeline (品红底与模板只留本机，不入库)
 dev/art-raw/
 dev/.cursor-core/
+*-magenta.png
+
+# 跑步散帧：局内只用 *-run-sheet.png，切格产物勿提交
+www/castle-parkour/assets/mage-run[0-9].png
+www/castle-parkour/assets/warrior-run[0-9].png
+www/castle-parkour/assets/*-jump-sheet.png
+www/castle-parkour/assets/*-atk-sheet.png
+
+# editor / agent junk
+.cursor/
+*.local-bak
