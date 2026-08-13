@@ -37,13 +37,3 @@
 ## 技术说明
 
 本仓库为可独立发布的静态页游戏（Cloudflare Pages 产物为 `www/castle-parkour/`）。若嵌在 XRK-AGT 中，挂载路径为 `/castle-parkour`。
-
-### 仓库与发布命名
-
-| 项 | 名称 |
-|---|---|
-| GitHub 仓库 | `yumumo/castle-parkour`（由 `blazing-mage` 更名） |
-| 本地 remote | `git@github.com:yumumo/castle-parkour.git` |
-| Cloudflare Pages | 项目名 `castle-parkour`，输出目录 `www/castle-parkour/` |
-
-若远端仍叫 `blazing-mage`：在 GitHub → Settings → General → Repository name 改为 `castle-parkour`；Pages 控制台同步改项目名或新建后指向本仓。
