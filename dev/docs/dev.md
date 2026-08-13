@@ -2,7 +2,13 @@
 
 `www/castle-parkour/` 为静态网页游戏（HTML 壳 + `css/` + ES module `js/`）。默认逻辑在 Canvas；PNG 在 `assets/`。
 
-**AI 贴图**：主仓 skill `castle-parkour-art` + 规则 `.cursor/rules/castle-parkour-art.mdc`（品红底 → chroma key；勿在本 Core 内写规则副本）。
+**AI 贴图**：主仓 skill `castle-parkour-art` + 规则 `.cursor/rules/castle-parkour-art.mdc`。
+
+- **Likeness 真源**：`assets/*-portrait.png`（立绘）
+- 流程：品红底生图 → chroma key →（sheet 切格 / 对齐 `refH`）→ `sprite-manifest.json`
+- 学习笔记：`.cursor/skills/castle-parkour-art/references/sprite-animator-notes.md`
+- 本轮变更摘要：`dev/docs/SESSION_20260813.md`
+- 动作入库（不改 run）：`python core/castle-parkour/dev/ingest_motion_from_portrait.py`
 
 ## 发布结构
 
@@ -13,8 +19,10 @@ www/castle-parkour/
   js/boot-mobile.js
   js/main.js              # import ./game.js
   js/game.js
+  js/config/index.js      # barrel
   js/config/characters.js # 角色扩展点
   js/config/world.js      # 世界贴图扩展点
+  js/config/gameplay.js   # 玩法数值扩展点
   assets/
   _headers
 ```
@@ -42,7 +50,7 @@ pages_build_output_dir = "www/castle-parkour"
 | 火球 | 半径 7，基础速度 700px/s | 火球升级继续提高速度 |
 | 能量 | 100 上限，25/发，30/s 回复 | 默认可 4 连射 |
 | 同屏火球 | 6 | 防止无限堆积 |
-| 坑宽 | 前期 80-120px，后期 130-180px | 结合冷却与安全区生成 |
+| 坑宽 | 前期 62-92px，后期 110-150px | 见 `config/gameplay.js`；结合冷却与安全区 |
 
 ## 机制与规则
 

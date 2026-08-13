@@ -5,11 +5,88 @@ import {
   CHAR_SPRITES,
   CHAR_RUN_SHEETS,
   CHAR_ROLL_SHEETS,
-} from './config/characters.js';
-import { WORLD_ASSETS } from './config/world.js';
+  WORLD_ASSETS,
+  VIEW,
+  U,
+  GROUND,
+  CHAR_X,
+  CHAR_W,
+  CHAR_H_STAND,
+  CHAR_H_DUCK,
+  GRAV,
+  JUMP_V,
+  DOUBLE_JUMP_V,
+  WALL_H,
+  BEAM_BOTTOM,
+  ATTACK_CD,
+  WARRIOR_ATTACK_CD,
+  SWORD_SLASH_DUR,
+  MAGE_ATK_DUR,
+  MAGE_ATK_FIRE_AT,
+  FB_SPEED,
+  FB_R,
+  SWORD_BASE_RANGE,
+  MAX_BULLETS,
+  ORBIT_COUNT,
+  ORBIT_R,
+  ORBIT_SHOOT_CD,
+  ORBIT_SEEK_RANGE,
+  BAT_W,
+  BAT_H,
+  BAT_EXTRA_VX,
+  ROLL_DUR,
+  ROLL_SPEED_BOOST,
+  ROLL_CD,
+  FAST_FALL_V,
+  COIN_R,
+  COIN_VALUE,
+  COIN_PICKUP_R,
+  COIN_DRAW_H,
+  PX_PER_METER,
+  KILL_GOLD,
+  METER_PER_GOLD,
+  GAP_W_MIN,
+  GAP_W_MAX,
+  GAP_COOLDOWN,
+  OBSTACLE_MARGIN,
+  POST_GAP_SAFE,
+  GAP_DEPTH,
+  GAP_W_LATE_MIN,
+  GAP_W_LATE_MAX,
+  LAYER_H,
+  LAYER2_TOP,
+  PLATFORM_H,
+  PLATFORM_W_MIN,
+  PLATFORM_W_MAX,
+  SPIKE_H,
+  SPIKE_W,
+  FLYER_BASE_Y,
+  FLYER_W,
+  FLYER_H,
+  FLYER_AMP,
+  PORTAL_DRAW_H,
+  PORTAL_SUCK_DUR,
+  PORTAL_SUCK_X,
+  SKY_SPRINT_DUR,
+  SKY_SPRINT_FADE,
+  SKY_SPRINT_H,
+  SKY_SPRINT_SPEED_MAX,
+  ENERGY_MAX,
+  ENERGY_COST,
+  ENERGY_REGEN,
+  TUTORIAL_END,
+  TUTORIAL_LEAD_PX,
+  CASTLE_FONT,
+} from './config/index.js';
 
 const canvas = document.getElementById('game');
+if (canvas.width !== VIEW.W || canvas.height !== VIEW.H) {
+  canvas.width = VIEW.W;
+  canvas.height = VIEW.H;
+}
 const ctx = canvas.getContext('2d');
+const W = VIEW.W;
+const H = VIEW.H;
 const scoreEl = document.getElementById('score');
 const bestEl = document.getElementById('best');
 const hudGoldEl = document.getElementById('hud-gold');
@@ -47,12 +124,9 @@ function setSfxVolume(v) {
   localStorage.setItem('castle-parkour-vol-sfx', String(v));
 }
 
-// BGM：月夜城墙——偏暗小调琶音，节奏略慢
-const BGM_MELODY = [
-  392, 466, 523, 466, 392, 349, 392, 466,
-  523, 587, 523, 466, 392, 349, 330, 392,
-];
-const BGM_BASS = [196, 196, 233, 233, 175, 175, 196, 233];
+// BGM：古堡夜奔——小调琶音 + 低音鼓点感
+const BGM_MELODY = [147, 175, 196, 233, 220, 196, 175, 156, 147, 175, 208, 233, 262, 233, 196, 175];
+const BGM_BASS = [73, 73, 65, 65, 78, 78, 87, 87, 73, 65, 78, 87, 98, 87, 78, 73];
 let bgmIdx = 0;
 
 function playBgmNote() {
@@ -63,10 +137,20 @@ function playBgmNote() {
   osc.type = 'triangle';
   osc.frequency.value = BGM_MELODY[bgmIdx % BGM_MELODY.length];
   g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(0.18, t + 0.03);
-  g.gain.exponentialRampToValueAtTime(0.01, t + 0.36);
+  g.gain.linearRampToValueAtTime(0.16, t + 0.04);
+  g.gain.exponentialRampToValueAtTime(0.01, t + 0.42);
   osc.connect(g); g.connect(bgmGain);
-  osc.start(t); osc.stop(t + 0.4);
+  osc.start(t); osc.stop(t + 0.45);
+  // soft pad harmonic for castle mood
+  const pad = audioCtx.createOscillator();
+  const pg = audioCtx.createGain();
+  pad.type = 'sine';
+  pad.frequency.value = BGM_MELODY[bgmIdx % BGM_MELODY.length] * 0.5;
+  pg.gain.setValueAtTime(0, t);
+  pg.gain.linearRampToValueAtTime(0.06, t + 0.05);
+  pg.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+  pad.connect(pg); pg.connect(bgmGain);
+  pad.start(t); pad.stop(t + 0.55);
   if (bgmIdx % 2 === 0) {
     const bosc = audioCtx.createOscillator();
     const bg = audioCtx.createGain();
@@ -79,7 +163,7 @@ function playBgmNote() {
     bosc.start(t); bosc.stop(t + 0.65);
   }
   bgmIdx++;
-  bgmTimer = setTimeout(playBgmNote, 280);
+  bgmTimer = setTimeout(playBgmNote, 320);
 }
 
 function startBGM() {
@@ -198,27 +282,6 @@ function sfxRoll() {
 }
 
 // ===================== 常量 =====================
-const W = canvas.width;
-const H = canvas.height;
-const U = 40;
-const GROUND = 420;
-const CHAR_X = 120;
-const CHAR_W = 30;
-const CHAR_H_STAND = 2 * U;
-const CHAR_H_DUCK = 1 * U;
-const JUMP_H = 2.6 * U;
-const GRAV = 2000;
-const JUMP_V = Math.sqrt(2 * GRAV * JUMP_H);
-const WALL_H = 1.5 * U;
-const BEAM_BOTTOM = GROUND - 1.5 * U;
-const ATTACK_CD = 0.28;
-const WARRIOR_ATTACK_CD = 0.3;
-const SWORD_SLASH_DUR = 0.22;
-const MAGE_ATK_DUR = 0.38;     // 法师攻击整段动作时长
-const MAGE_ATK_FIRE_AT = 0.14; // 前摇后出火球
-const FB_SPEED = 700;
-const FB_R = 7;
-const SWORD_BASE_RANGE = 92;
 const WARRIOR_BUY_COST = 800;
 const TALENT_UNLOCK_COST = 500;
 const TALENT_UP_COST = (lv) => 200 + lv * 150;
@@ -244,17 +307,7 @@ const UP_COST_MAGE_EN = (lv) => lv * 60;
 const UP_COST_WARRIOR_HP = (hp) => (hp - WARRIOR_HP_MIN + 1) * 100;
 const UP_COST_WARRIOR_SHD = () => 180;
 const UP_COST_WARRIOR_ATK = (lv) => 110 + lv * 80;
-const MAX_BULLETS = 6;
-const ORBIT_COUNT = 3;
-const ORBIT_R = 42;
-const ORBIT_SHOOT_CD = 0.36;
-const ORBIT_SEEK_RANGE = 280;
-const BAT_W = 34;
-const BAT_H = 26;
-const BAT_EXTRA_VX = 180;
-const fbSpeed = () => FB_SPEED;
 const energyRegen = () => ENERGY_REGEN * (1 + (charData.mage.en - 1) * 0.2);
-const swordRange = () => SWORD_BASE_RANGE;
 const mageAtkPower = () => Math.min(MAGE_ATK_PWR_MAX, charData.mage.atk);
 const mageOrbitUnlocked = () => charData.mage.atk >= MAGE_ATK_MAX;
 const warriorAtkPower = () => Math.min(WARRIOR_ATK_PWR_MAX, WARRIOR_ATK_PWR_MIN + charData.warrior.atk - 1);
@@ -287,13 +340,8 @@ function shelterCdSec() {
 }
 
 // 起飞（原天空冲刺：永久护盾破碎 / 护盾道具充能救场 / 地图起飞道具）
-const SKY_SPRINT_DUR = 3.0;       // 总时长 3 秒
-const SKY_SPRINT_FADE = 0.5;      // 淡入淡出时长
-const SKY_SPRINT_H = 320;         // 起飞高度
-const SKY_SPRINT_SPEED_MAX = 2800; // 最大速度 px/s（3秒内覆盖约300m）
 
 // 新手教程：提示可早出现；时停延后到障碍靠近后再触发（单次跳/滚即可过）
-const TUTORIAL_END = 420;
 const TUTORIAL_STEPS = [
   { m: 12,  type: 'info',    title: '基本操作', text: 'W/↑/空格 跳跃 · S/↓ 翻滚 · J/鼠标左键 攻击', wait: 2.8 },
   { m: 55,  type: 'wall',    title: '跳跃躲避', text: '靠近火桩时按 W 或空格跳过去！', action: 'jump', freezeAt: 100 },
@@ -306,58 +354,30 @@ const TUTORIAL_STEPS = [
   { m: 410, type: 'info',    title: '教程完成', text: '祝你好运，开始冒险吧！', wait: 2.5 },
 ];
 // 障碍生成前置：提示更早；真正时停由 freezeAt 控制
-const TUTORIAL_LEAD_PX = 240;
 
 // 能量系统（限制子弹滥用）
-const ENERGY_MAX = 100;
-const ENERGY_COST = 25;        // 每发消耗 25 能量（从 30 降低，可发 4 连射）
-const ENERGY_REGEN = 30;       // 每秒恢复 30 能量（从 22 提升，更快回能）
 
 // 二段跳
-const DOUBLE_JUMP_H = 2.0 * U;
-const DOUBLE_JUMP_V = Math.sqrt(2 * GRAV * DOUBLE_JUMP_H);
 
 // 翻滚（一键动作，短暂加速穿过障碍）
-const ROLL_DUR = 0.55;         // 翻滚持续秒数
-const ROLL_SPEED_BOOST = 200;  // 翻滚时额外世界速度 px/s
-const ROLL_CD = 0.15;          // 翻滚冷却（防连按）
-const FAST_FALL_V = 1200;      // 空中下蹲快速落地速度
 
 // 金币拾取
-const COIN_R = 10;
-const COIN_VALUE = 5;
-const COIN_PICKUP_R = 38;      // 拾取半径（从 32 提升至 38，高速时更容易拾取）
 
 // 计分（统一口径：worldX 为唯一真源）
-const PX_PER_METER = 26;       // 260px/s = 10m/s
-const KILL_GOLD = 10;
-const METER_PER_GOLD = 5;      // 每 5m 产 1 金币（距离收入翻倍，跑酷更有回报感）
 
 // 缺口生成（加宽，确保高速时可掉入）
-const GAP_W_MIN = 80;
-const GAP_W_MAX = 120;
-const GAP_COOLDOWN = 5;
-const OBSTACLE_MARGIN = 60;
-const POST_GAP_SAFE = 140;
+
+// 高度分层：角色占 2 层；第 2 层供蝙蝠/高台顶部
 
 // 高台平台（多层平台机制）
-const PLATFORM_H = 85;         // 高台离地高度（≈2.1U，跳跃可达）
-const PLATFORM_W_MIN = 90;     // 高台最小宽度
-const PLATFORM_W_MAX = 160;    // 高台最大宽度
 
 // 地刺（地面陷阱）
-const SPIKE_H = 0.7 * U;       // 地刺高度（28px，需跳跃避开）
-const SPIKE_W = 48;            // 地刺宽度
 
-// 飞行障碍（空中敌人）
-const FLYER_BASE_Y = GROUND - 2.3 * U;  // 飞行基准高度（需蹲伏或站高台避开）
-const FLYER_W = 36;
-const FLYER_H = 28;
-const FLYER_AMP = 25;          // 上下振幅
+// 飞行障碍（空中敌人，偏第 2 层）
 
 // 后期坑洞参数（加宽，确保高速时可掉入）
-const GAP_W_LATE_MIN = 130;    // 600m后坑宽下限
-const GAP_W_LATE_MAX = 180;    // 600m后坑宽上限
+
+// 传送门
 
 // ===================== 持久化 =====================
 const LS = {
@@ -488,6 +508,8 @@ let runTime = 0;
 let killCount = 0;
 let energy = ENERGY_MAX;     // 能量（子弹资源）
 let canDoubleJump = false;   // 二段跳可用
+let airAge = 0;              // 离地时长（动作衔接）
+let landPoseT = 0;           // 落地缓冲帧计时
 let lastMilestone = 0;       // 上次里程碑距离
 let milestoneFx = 0;         // 里程碑特效计时
 let milestoneText = '';      // 里程碑文字
@@ -521,6 +543,7 @@ let bonusDist = 0;             // 奖励空间已跑距离
 const BONUS_DIST_MAX = 300;    // 奖励空间长度 300m（缩短，控制金币总量）
 let nextPortalDist = 1500 + Math.random() * 1500; // 下次传送门距离
 let portal = null;             // 传送门实体 { x, y, phase }
+let portalSuck = null;         // 吸入中 { t, fromX, fromY, toX, toY }
 let bonusReturnDist = 0;       // 进入奖励空间前的世界距离
 let transitionFx = 0;          // 过渡特效计时
 let bonusFinaleSpawned = false; // 奖励空间收尾金币是否已生成
@@ -673,11 +696,11 @@ function tryPlace(make, availStart, availEnd, w) {
   return false;
 }
 
-// 跳跃类 ↔ 蹲伏类：段冷却交叉 + 像素间距，避免「刚跳完立刻蹲 / 刚蹲完立刻跳」
-// 段冷却取 2：既防连招，又不把前期内容下限压得过空
+// 跳跃类 ↔ 蹲伏类：段冷却交叉 + 像素间距
+// 交叉冷却取 1，避免吊梁被跳类障碍长时间堵死
 const ACTION_SEG_CD = 2;
-const ACTION_CROSS_CD = 2;
-const ACTION_SEP_PX = 340;
+const ACTION_CROSS_CD = 1;
+const ACTION_SEP_PX = 280;
 function markJumpAction() {
   jumpObsCd = Math.max(jumpObsCd, ACTION_SEG_CD);
   duckObsCd = Math.max(duckObsCd, ACTION_CROSS_CD);
@@ -731,10 +754,11 @@ function clearAhead(safeEnd, opts = {}) {
 }
 
 function obstacleSpawnChance(d) {
-  if (d < 25) return 0.30;
-  if (d < 80) return 0.38;
-  if (d < 200) return 0.48;
-  return Math.min(0.55, 0.48 + (d - 200) / 4000);
+  // 开局即可刷，随距离略增
+  if (d < 80) return 0.78;
+  if (d < 220) return 0.86;
+  if (d < 450) return 0.92;
+  return 0.96;
 }
 
 function spawnSegmentCoins(x0, x1, d) {
@@ -768,8 +792,9 @@ function spawnSegmentCoins(x0, x1, d) {
     if (allSafe && testX + totalW < x1 - OBSTACLE_MARGIN) { startX = testX; break; }
   }
   if (startX < 0) return;
-  const baseY = GROUND - 50;
-  const amp = 32;
+  // 弧顶须落在单跳拾取窗内：peak ≈ GROUND-(base+amp)，JUMP_H=104 / pickupR=48
+  const baseY = GROUND - 46;
+  const amp = 34;
   // 70% 弧 / 20% 平 / 10% 轻之字
   const pattern = Math.random();
   for (let i = 0; i < n; i++) {
@@ -777,7 +802,7 @@ function spawnSegmentCoins(x0, x1, d) {
     if (cx > x1 - OBSTACLE_MARGIN) break;
     let cy;
     const t = n > 1 ? i / (n - 1) : 0;
-    if (pattern < 0.70) cy = baseY - Math.sin(t * Math.PI) * amp;
+    if (pattern < 0.82) cy = baseY - Math.sin(t * Math.PI) * amp;
     else if (pattern < 0.90) cy = baseY;
     else cy = i % 2 === 0 ? baseY : baseY - 18;
     coins.push({ x: cx, y: cy, bob: i * 0.5, taken: false });
@@ -785,8 +810,7 @@ function spawnSegmentCoins(x0, x1, d) {
 }
 
 function trySpawnObstacle(x0, x1, d) {
-  if (gapCooldown <= 1) return;
-
+  // 坑后首段由 afterGap 跳过；此处不再用 gapCooldown 反逻辑把整段跑酷饿死
   if (featureCooldown > 0) {
     featureCooldown--;
     return;
@@ -804,7 +828,7 @@ function trySpawnObstacle(x0, x1, d) {
   const pool = [];
   if (jumpObsCd <= 0) {
     pool.push({
-      w: 24, minW: 36,
+      w: 26, minW: 36,
       run(x) {
         if (nearDuckHazards(x, 36)) return false;
         walls.push({ x, w: 36 });
@@ -813,9 +837,18 @@ function trySpawnObstacle(x0, x1, d) {
       },
     });
     pool.push({
-      w: 28, minW: 28,
+      w: 24, minW: 40,
       run(x) {
-        const big = Math.random() < (d > 250 ? 0.3 : 0.18);
+        if (nearDuckHazards(x, 36)) return false;
+        walls.push({ x, w: 40 });
+        markJumpAction();
+        return true;
+      },
+    });
+    pool.push({
+      w: 42, minW: 28,
+      run(x) {
+        const big = Math.random() < (d > 250 ? 0.32 : 0.2);
         const mw = big ? 46 : 28;
         if (nearDuckHazards(x, mw)) return false;
         monsters.push({ x, big, hp: big ? 2 : 1, phase: Math.random() * 6.28 });
@@ -823,9 +856,9 @@ function trySpawnObstacle(x0, x1, d) {
         return true;
       },
     });
-    if (d > 70) {
+    if (d > 40) {
       pool.push({
-        w: 14, minW: SPIKE_W,
+        w: 24, minW: SPIKE_W,
         run(x) {
           if (nearDuckHazards(x, SPIKE_W)) return false;
           spikes.push({ x, w: SPIKE_W });
@@ -836,22 +869,23 @@ function trySpawnObstacle(x0, x1, d) {
     }
   }
   if (duckObsCd <= 0) {
+    // 吊梁权重抬高，短段面也能放
     pool.push({
-      w: 24, minW: 150,
+      w: 110, minW: 80,
       run(x) {
-        const bw = 100 + Math.random() * 50;
+        const bw = 72 + Math.random() * 40;
         if (x + bw > availEnd) return false;
-        if (nearJumpHazards(x, bw)) return false;
+        if (nearJumpHazards(x, bw, 180)) return false;
         beams.push({ x, w: bw });
         markDuckAction();
         return true;
       },
     });
-    if (d > 90) {
+    if (d > 60) {
       pool.push({
-        w: 14, minW: FLYER_W,
+        w: 36, minW: FLYER_W,
         run(x) {
-          if (nearJumpHazards(x, FLYER_W)) return false;
+          if (nearJumpHazards(x, FLYER_W, 180)) return false;
           flyers.push({ x, baseY: FLYER_BASE_Y, phase: Math.random() * 6.28, w: FLYER_W });
           markDuckAction();
           return true;
@@ -875,16 +909,19 @@ function trySpawnObstacle(x0, x1, d) {
     const ent = pool[idx];
     const placed = tryPlace((x) => ent.run(x), availStart, availEnd, ent.minW);
     if (placed) {
-      featureCooldown = 2 + Math.floor(d / 400);
+      featureCooldown = Math.max(0, Math.floor(d / 900));
       return;
     }
   }
 }
 
 function trySpawnBat(d) {
-  if (d <= 60 || bonusActive || Math.random() >= 0.09) return;
-  const by = GROUND - 65 - Math.random() * 110;
-  bats.push({ x: W + 36, y: by, phase: Math.random() * 6.28, hp: 1 });
+  // 只在第 2 层高度带巡航，从更远屏外进入，不冲脸
+  if (d <= 110 || bonusActive || Math.random() >= 0.038) return;
+  const yTop = GROUND - LAYER2_TOP - LAYER_H + 6;
+  const yBot = GROUND - LAYER2_TOP - 6;
+  const by = yTop + Math.random() * Math.max(8, yBot - yTop);
+  bats.push({ x: W + 420, y: by, y0: by, phase: Math.random() * 6.28, hp: 1 });
 }
 
 // ===================== 世界生成 =====================
@@ -922,7 +959,7 @@ function spawnFeature(x0, x1, afterGap) {
         const cx = startX + i * spacing;
         if (cx > x1 - OBSTACLE_MARGIN) break;
         const t = n > 1 ? i / (n - 1) : 0;
-        const cy = GROUND - 52 - Math.sin(t * Math.PI) * 42;
+        const cy = GROUND - 48 - Math.sin(t * Math.PI) * 40;
         coins.push({ x: cx, y: cy, bob: i * 0.5, taken: false });
       }
     }
@@ -943,11 +980,11 @@ function spawnFeature(x0, x1, afterGap) {
   }
 
   // ---- 传送门生成 ----
-  if (!bonusActive && !portal && distanceM() >= nextPortalDist) {
-    // 在当前段面生成传送门
+  if (!bonusActive && !portal && !portalSuck && distanceM() >= nextPortalDist) {
+    // 在当前段面生成传送门（仅旋涡，居中悬浮）
     const px2 = x0 + OBSTACLE_MARGIN + Math.random() * Math.max(1, (x1 - x0) - 2 * OBSTACLE_MARGIN - 60);
-    if (isRangeFree(px2, 50, 30)) {
-      portal = { x: px2, y: GROUND - 80, phase: 0 };
+    if (isRangeFree(px2, Math.max(90, PORTAL_SUCK_X * 2), 40)) {
+      portal = { x: px2, y: Math.round(GROUND * 0.52), phase: 0 };
     }
   }
 }
@@ -999,7 +1036,7 @@ function genStep() {
     return;
   }
 
-  const gapChance = d < 40 ? 0.08 : Math.min(0.20, 0.10 + d / 14000);
+  const gapChance = d < 40 ? 0.05 : Math.min(0.16, 0.07 + d / 16000);
   const isGap = gapCooldown <= 0 && jumpObsCd <= 0 && duckObsCd <= 0 && Math.random() < gapChance;
   if (isGap) {
     // 后期坑洞加宽：300m 开始渐增，600m 后达到 130-180px
@@ -1026,16 +1063,16 @@ function genStep() {
   const dLen = Math.max(0, (500 - Math.min(500, d)) / 500); // 1→0 随距离递减
   let len;
   if (platformAfterGap === 0) {
-    len = 260 + dLen * 20 + Math.random() * (120 + dLen * 20);  // 着陆缓冲段：280-420px → 260-380px
+    len = POST_GAP_SAFE + 80 + dLen * 30 + Math.random() * 100; // 坑后更长安全区
   } else {
-    len = 170 + dLen * 20 + Math.random() * (140 + dLen * 20);  // 常规段：190-350px → 170-310px
+    len = 150 + dLen * 20 + Math.random() * (120 + dLen * 20);
   }
   platforms.push({ x0: genX, x1: genX + len });
   spawnFeature(genX, genX + len, platformAfterGap === 0);
   genX += len;
 
   // 高台：需跳跃；且不得紧贴横梁/飞物（否则跳上高台后立刻要蹲）
-  if (d > 120 && platformAfterGap >= 2 && jumpObsCd <= 0 && duckObsCd <= 0 && gapCooldown > 1 && Math.random() < 0.14) {
+  if (d > 120 && platformAfterGap >= 2 && jumpObsCd <= 0 && duckObsCd <= 0 && Math.random() < 0.14) {
     const pw = PLATFORM_W_MIN + Math.random() * (PLATFORM_W_MAX - PLATFORM_W_MIN);
     const segStart = genX - len;
     for (let t = 0; t < 6; t++) {
@@ -1068,9 +1105,9 @@ function spawnBonusCoins() {
       const cx = baseX + i * 40;
       const t = n > 1 ? i / (n - 1) : 0;
       let cy;
-      if (pattern === 1) cy = GROUND - 55 - Math.sin(t * Math.PI) * 55;
+      if (pattern === 1) cy = GROUND - 52 - Math.sin(t * Math.PI) * 40;
       else if (pattern === 0) cy = GROUND - 48;
-      else cy = i % 2 === 0 ? GROUND - 42 : GROUND - 95;
+      else cy = i % 2 === 0 ? GROUND - 42 : GROUND - 78;
       coins.push({ x: cx, y: cy, bob: i * 0.5, taken: false });
     }
   }
@@ -1083,9 +1120,22 @@ function spawnBonusFinale() {
   for (let i = 0; i < n; i++) {
     const cx = baseX + i * 35;
     const t = n > 1 ? i / (n - 1) : 0;
-    const cy = GROUND - 40 - Math.sin(t * Math.PI) * 100;
+    const cy = GROUND - 40 - Math.sin(t * Math.PI) * 72;
     coins.push({ x: cx, y: cy, bob: i * 0.3, taken: false });
   }
+}
+
+function enterBonusSpace() {
+  bonusReturnDist = distanceM();
+  bonusActive = true;
+  bonusDist = 0;
+  bonusFinaleSpawned = false;
+  transitionFx = 1.0;
+  portal = null;
+  portalSuck = null;
+  walls = []; beams = []; monsters = []; spikes = []; flyers = []; bats = []; elevatedPlatforms = []; gaps = [];
+  platforms.push({ x0: CHAR_X - 40, x1: CHAR_X + 1200 });
+  spawnBonusCoins();
 }
 
 // ===================== 游戏控制 =====================
@@ -1097,7 +1147,7 @@ function reset() {
   px = 0; vy = 0; ducking = false; rollTimer = 0; rollCdTimer = 0; fastFalling = false; atkCd = 0; attackFx = 0;
   worldX = 0; killCount = 0; runTime = 0;
   genX = 0; gapCooldown = 3; invincible = 0;
-  energy = ENERGY_MAX; canDoubleJump = false;
+  energy = ENERGY_MAX; canDoubleJump = false; airAge = 0; landPoseT = 0;
   lastMilestone = 0; milestoneFx = 0; milestoneText = '';
   coinPickups = 0; featureCooldown = 0; duckObsCd = 0; jumpObsCd = 0; platformAfterGap = 0;
   powerups = []; puSpawnNextM = tutorialActive ? 280 : 80; puTimers = { magnet: 0, double: 0, attack: 0 };
@@ -1132,7 +1182,7 @@ function reset() {
   // 奖励空间重置
   bonusActive = false; bonusDist = 0;
   nextPortalDist = 1500 + Math.random() * 1500;
-  portal = null; transitionFx = 0; bonusReturnDist = 0;
+  portal = null; portalSuck = null; transitionFx = 0; bonusReturnDist = 0;
   bonusFinaleSpawned = false;
   // 道具状态重置 + 从 ownedItems 装备选中的道具
   activeItems = { double: false, revive: false };
@@ -1284,7 +1334,7 @@ function triggerRoll() {
   if (rollCdTimer > 0) return;
   rollTimer = ROLL_DUR;
   rollCdTimer = ROLL_DUR + ROLL_CD;
-  invincible = Math.max(invincible, ROLL_DUR * 0.8);
+  // 翻滚靠缩小碰撞盒钻过吊梁/飞物，不给无敌帧
   sfxRoll();
 }
 
@@ -1320,7 +1370,8 @@ function damageBat(bat, dmg) {
 
 function meleeHitInRange(range) {
   const fy = GROUND - px - U * (ducking ? 0.5 : 1);
-  const box = { x: CHAR_X + CHAR_W / 2, y: fy - 36, w: range, h: 48 };
+  // 覆盖略高于头顶的目标（高台/蝙蝠）
+  const box = { x: CHAR_X + CHAR_W / 2, y: fy - 86, w: range, h: 108 };
   const dmg = isWarrior() ? warriorAtkPower() : 1;
   for (let i = monsters.length - 1; i >= 0; i--) {
     const mo = monsters[i];
@@ -1354,7 +1405,7 @@ function attack() {
   if (isWarrior()) {
     attackFx = SWORD_SLASH_DUR;
     atkCd = atkBoost ? WARRIOR_ATTACK_CD * 0.7 : WARRIOR_ATTACK_CD;
-    const range = swordRange() * (atkBoost ? 1.2 : 1);
+    const range = SWORD_BASE_RANGE * (atkBoost ? 1.2 : 1);
     warriorSlashT = SWORD_SLASH_DUR;
     swordSwings.push({ t: SWORD_SLASH_DUR, dur: SWORD_SLASH_DUR, range });
     meleeHitInRange(range);
@@ -1366,7 +1417,7 @@ function attack() {
     energy -= cost;
     attackFx = MAGE_ATK_DUR;
     const fy = GROUND - px - U * (ducking ? 0.55 : 1.05);
-    const fbs = atkBoost ? fbSpeed() * 1.45 : fbSpeed();
+    const fbs = atkBoost ? FB_SPEED * 1.45 : FB_SPEED;
     pendingMageShot = { delay: MAGE_ATK_FIRE_AT, fy, fbs };
     tryChargeOrbitOrb();
     sfxAttack();
@@ -1480,7 +1531,7 @@ function updateOrbitOrbs(dt) {
   const dx = target.x - p.x;
   const dy = target.y - p.y;
   const len = Math.hypot(dx, dy) || 1;
-  const spd = fbSpeed() * 1.4;
+  const spd = FB_SPEED * 1.4;
   fireballs.push({
     x: p.x,
     y: p.y,
@@ -1587,6 +1638,36 @@ function update(dt) {
   // 教程动作提示期间暂停世界滚动，避免怪物/障碍离屏后教程步骤永久卡住。
   if (tutFreeze) spd = 0;
 
+  // 传送门：靠近自动吸入（无需跳进）
+  if (portal && !bonusActive && !portalSuck) {
+    const pcx = CHAR_X + CHAR_W / 2;
+    const dx = portal.x - pcx;
+    if (dx <= PORTAL_SUCK_X && dx >= -PORTAL_SUCK_X * 0.35) {
+      const footY = rollTimer > 0 ? (onPlatformY || 0) : px;
+      portalSuck = {
+        t: 0,
+        fromX: pcx,
+        fromY: GROUND - footY - CHAR_H_STAND * 0.5,
+        toX: portal.x,
+        toY: portal.y,
+      };
+      invincible = Math.max(invincible, PORTAL_SUCK_DUR + 0.2);
+    }
+  }
+  if (portalSuck) {
+    // 吸入期间冻结世界，角色飞向旋涡中心
+    spd = 0;
+    if (portal) {
+      portalSuck.toX = portal.x;
+      portalSuck.toY = portal.y;
+    }
+    portalSuck.t += dt;
+    if (portalSuck.t >= PORTAL_SUCK_DUR) {
+      portalSuck = null;
+      enterBonusSpace();
+    }
+  }
+
   // 世界位移
   worldX += spd * dt;
 
@@ -1610,30 +1691,6 @@ function update(dt) {
     }
   }
 
-  // 传送门碰撞检测
-  if (portal && !bonusActive) {
-    const pcx = CHAR_X + CHAR_W / 2;
-    const pcy = GROUND - px - U;
-    const dx = portal.x - pcx;
-    const dy = portal.y - pcy;
-    if (dx * dx + dy * dy < 50 * 50) {
-      // 进入奖励空间
-      bonusReturnDist = distanceM();
-      bonusActive = true;
-      bonusDist = 0;
-      bonusFinaleSpawned = false;
-      transitionFx = 1.0;
-      portal = null;
-      // 清空所有障碍物、怪物（保留金币机制由奖励空间生成覆盖）
-      walls = []; beams = []; monsters = []; spikes = []; flyers = []; bats = []; elevatedPlatforms = []; gaps = [];
-      // 保留局内道具实体和已激活的道具效果，让磁铁/双倍在奖励空间继续生效
-      // 确保连续地面（填补可能的坑洞）
-      platforms.push({ x0: CHAR_X - 40, x1: CHAR_X + 1200 });
-      // 生成奖励空间专用金币（大量，多种排列）
-      spawnBonusCoins();
-    }
-  }
-
   // 实体左移（含金币、高台、地刺、飞行障碍）
   for (const arr of [platforms, gaps, walls, beams, monsters, elevatedPlatforms, spikes]) {
     for (const o of arr) {
@@ -1644,7 +1701,12 @@ function update(dt) {
   for (const f of flyers) f.x -= spd * dt;
   for (const b of bats) {
     b.x -= (spd + BAT_EXTRA_VX) * dt;
-    b.y += Math.sin(animT * 4 + b.phase) * 28 * dt;
+    const y0 = b.y0 ?? b.y;
+    const yTop = GROUND - LAYER2_TOP - LAYER_H + 4;
+    const yBot = GROUND - LAYER2_TOP - 4;
+    b.y = y0 + Math.sin(animT * 2.2 + b.phase) * 10;
+    if (b.y < yTop) b.y = yTop;
+    if (b.y > yBot) b.y = yBot;
   }
   for (const c of coins) c.x -= spd * dt;
   for (const p of powerups) p.x -= spd * dt;
@@ -1705,10 +1767,20 @@ function update(dt) {
       // 着陆安全区：30m（780px）内无障碍无怪物
       clearAhead(CHAR_X + 780, { featureCd: 4, gapCd: 4 });
     }
+  } else if (portalSuck) {
+    // 吸入中：冻结物理，视觉由 drawPlayer 插值
+    vy = 0;
+    ducking = false;
+    rollTimer = 0;
   } else {
     // 翻滚触发：单次按下，地面时启动
     if (duckPressed && px <= 0.5 + onPlatformY) triggerRoll();
     ducking = rollTimer > 0;
+    if (ducking) {
+      // 翻滚贴地 + 矮碰撞盒
+      px = onPlatformY || 0;
+      vy = 0;
+    }
     if (ducking && tutorialShown && tutorialStep < TUTORIAL_STEPS.length && TUTORIAL_STEPS[tutorialStep].action === 'duck') tutorialActionDone = true;
     const wantJump = keys.has('KeyW') || keys.has('ArrowUp') || keys.has('Space');
 
@@ -1733,6 +1805,8 @@ function update(dt) {
       vy = JUMP_V;
       px = currentGround + 0.1;
       canDoubleJump = true;
+      airAge = 0;
+      landPoseT = 0;
       sfxJump();
       if (tutorialShown && tutorialStep < TUTORIAL_STEPS.length && TUTORIAL_STEPS[tutorialStep].action === 'jump') tutorialActionDone = true;
     } else if (!tutFreeze && !grounded && jumpPressed && canDoubleJump) {
@@ -1740,7 +1814,13 @@ function update(dt) {
       vy = Math.max(vy, 0) + DOUBLE_JUMP_V;
       canDoubleJump = false;
       fastFalling = false;
+      airAge = 0;
+      sfxJump();
     }
+
+    if (!grounded || vy > 0) airAge += dt;
+    else airAge = 0;
+    if (landPoseT > 0) landPoseT = Math.max(0, landPoseT - dt);
 
     if (tutFreeze) {
       // 冻结期间起跳可升到最高点后悬停，恢复滚动后仍能越过墙/坑
@@ -1761,6 +1841,8 @@ function update(dt) {
             vy = 0;
             onPlatformY = p.y;
             canDoubleJump = false;
+            landPoseT = 0.12;
+            airAge = 0;
             if (fastFalling) { fastFalling = false; triggerRoll(); }
             break;
           }
@@ -1769,16 +1851,21 @@ function update(dt) {
     }
     // 地面着陆检测
     if (!tutFreeze && onPlatformY === 0 && vy <= 0 && px <= 0 && groundAt(CHAR_X)) {
+      if (airAge > 0.08) landPoseT = Math.max(landPoseT, 0.12);
       px = 0;
       vy = 0;
       canDoubleJump = false;
+      airAge = 0;
       if (fastFalling) { fastFalling = false; triggerRoll(); }
     }
   }
   jumpPressed = false;
   duckPressed = false;
 
-  const chH = ducking ? CHAR_H_DUCK : CHAR_H_STAND;
+  // 翻滚：更矮更窄的碰撞盒（钻过上方障碍）；站立/普通蹲用标准尺寸
+  const rolling = rollTimer > 0;
+  const chH = rolling ? CHAR_H_DUCK * 0.85 : (ducking ? CHAR_H_DUCK : CHAR_H_STAND);
+  const chW = rolling ? CHAR_W * 0.72 : CHAR_W;
 
   // 掉坑判定（阈值 -25，确保高速时能掉入坑洞；起飞中跳过）
   if (px < -25 && !skySprintActive) {
@@ -1786,7 +1873,12 @@ function update(dt) {
     if (!running) return;
   }
 
-  const charBox = { x: CHAR_X - CHAR_W / 2, y: GROUND - px - chH, w: CHAR_W, h: chH };
+  const charBox = {
+    x: CHAR_X - chW / 2,
+    y: GROUND - px - chH,
+    w: chW,
+    h: chH,
+  };
 
   // 攻击
   if (keys.has('KeyJ')) attack();
@@ -1800,7 +1892,7 @@ function update(dt) {
     }
     if (fb.birth != null && fb.birth > 0) fb.birth -= dt;
     if (fb.accel) {
-      const cap = (fb.homeSpd || fbSpeed()) + speed() * 0.55;
+      const cap = (fb.homeSpd || FB_SPEED) + speed() * 0.55;
       fb.vx += fb.accel * dt;
       if (fb.vx > cap) { fb.vx = cap; fb.accel = 0; }
     }
@@ -1810,7 +1902,7 @@ function update(dt) {
         const dx = t.x - fb.x;
         const dy = t.y - fb.y;
         const len = Math.hypot(dx, dy) || 1;
-        const spd = fb.homeSpd || fbSpeed();
+        const spd = fb.homeSpd || FB_SPEED;
         const wantVx = (dx / len) * spd + speed() * 0.5;
         const wantVy = (dy / len) * spd * 0.95;
         const k = Math.min(1, dt * 14);
@@ -2010,29 +2102,6 @@ function update(dt) {
 }
 
 // ===================== 背景动画系统 =====================
-// 多层视差 + 呼吸效果
-const bgShapes = [];
-const SHAPE_COLORS = ['#ff9a6b', '#c4a0ff', '#ffd4a8', '#8ec5ff', '#ffb088'];
-
-// 星空
-for (let i = 0; i < 90; i++) {
-  bgShapes.push({
-    x: (i * 47.3) % (W + 40), y: ((i * 31.7) % 360),
-    size: 1 + (i % 3) * 0.7, speed: 0.04,
-    color: i % 5 === 0 ? '#ffe8b0' : '#e8eeff', type: 'dot', phase: (i % 7) * 0.9,
-  });
-}
-// 浮游光尘 / 余烬
-for (let i = 0; i < 36; i++) {
-  bgShapes.push({
-    x: (i * 31.5) % (W + 20), y: ((i * 67.3) % 420) + 40,
-    size: 2 + (i % 4) * 1.5, speed: 0.45,
-    color: SHAPE_COLORS[i % 5],
-    type: 'particle', phase: (i % 6) * 1.0, vy: 8 + (i % 5) * 3,
-  });
-}
-
-
 // 缓存背景渐变（每 3 帧更新一次，大幅减少 createGradient 调用）
 let _bgCacheFrame = 0;
 let _bgGrad = null;
@@ -2056,14 +2125,14 @@ function drawStoneHudPanel(x, y, w, h, alpha) {
 function drawHudText(text, x, y, opts = {}) {
   const {
     fill = '#fffaf0',
-    font: fontIn = 'bold 14px "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif',
+    font: fontIn = `700 15px ${CASTLE_FONT}`,
     align = 'left',
-    stroke = 4,
+    stroke = 5,
     baseline = 'alphabetic',
   } = opts;
-  const font = /PingFang|YaHei|Microsoft/.test(fontIn)
+  const font = /Noto|Cinzel|PingFang|YaHei|Microsoft|Segoe/.test(fontIn)
     ? fontIn
-    : fontIn.replace(/system-ui/g, '"Segoe UI","PingFang SC","Microsoft YaHei",system-ui');
+    : fontIn.replace(/system-ui|sans-serif|serif/g, CASTLE_FONT);
   ctx.save();
   ctx.font = font;
   ctx.textAlign = align;
@@ -2216,51 +2285,114 @@ function drawMerlons(wallY, scroll, period) {
   const m1 = Math.ceil((scroll + W) / period) + 1;
   for (let m = m0; m <= m1; m++) {
     const x = m * period - scroll;
-    ctx.fillStyle = '#2e2838';
-    ctx.fillRect(x + 6, wallY - 28, 30, 28);
-    ctx.fillRect(x + 44, wallY - 16, 18, 16);
-    ctx.fillStyle = '#221c2a';
-    ctx.fillRect(x + 36, wallY - 28, 5, 28);
-    ctx.fillRect(x + 62, wallY - 16, 4, 16);
-    ctx.fillStyle = 'rgba(200,210,255,0.12)';
-    ctx.fillRect(x + 6, wallY - 28, 30, 3);
+    ctx.fillStyle = '#353040';
+    ctx.fillRect(x + 6, wallY - 32, 32, 32);
+    ctx.fillRect(x + 46, wallY - 18, 20, 18);
+    ctx.fillStyle = '#252030';
+    ctx.fillRect(x + 38, wallY - 32, 5, 32);
+    ctx.fillRect(x + 66, wallY - 18, 4, 18);
+    ctx.fillStyle = 'rgba(220,200,160,0.16)';
+    ctx.fillRect(x + 6, wallY - 32, 32, 3);
+    // 垛口缝灯
+    if ((m & 1) === 0) {
+      ctx.fillStyle = 'rgba(255,170,80,0.2)';
+      ctx.fillRect(x + 16, wallY - 20, 6, 8);
+    }
   }
 }
 
+function drawPurpleBanner(x, y, h, sway) {
+  const mid = x + 7 + sway;
+  ctx.fillStyle = '#4a2a6a';
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + 16, y);
+  ctx.lineTo(x + 16, y + h - 10);
+  ctx.lineTo(mid, y + h);
+  ctx.lineTo(x, y + h - 10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = 'rgba(220,180,90,0.45)';
+  ctx.fillRect(x + 1, y, 14, 3);
+  ctx.fillStyle = 'rgba(255,210,120,0.25)';
+  ctx.beginPath();
+  ctx.arc(x + 8, y + h * 0.35, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 function drawIndoorHall(scroll) {
-  const wallY = GROUND - 218;
+  const wallY = GROUND - 232;
   const wallH = GROUND - wallY;
   const wallGrad = ctx.createLinearGradient(0, wallY, 0, GROUND);
-  wallGrad.addColorStop(0, '#3a3348');
-  wallGrad.addColorStop(0.45, '#342c3c');
-  wallGrad.addColorStop(1, '#2c2432');
+  wallGrad.addColorStop(0, '#2e2840');
+  wallGrad.addColorStop(0.35, '#383048');
+  wallGrad.addColorStop(0.7, '#322a3c');
+  wallGrad.addColorStop(1, '#2a2234');
   ctx.fillStyle = wallGrad;
   ctx.fillRect(0, wallY, W, wallH);
 
-  const rim = ctx.createLinearGradient(0, wallY, 0, wallY + 36);
-  rim.addColorStop(0, 'rgba(180,200,255,0.14)');
+  // 穹顶暗部
+  const vault = ctx.createLinearGradient(0, wallY, 0, wallY + 70);
+  vault.addColorStop(0, 'rgba(12,8,22,0.55)');
+  vault.addColorStop(1, 'rgba(12,8,22,0)');
+  ctx.fillStyle = vault;
+  ctx.fillRect(0, wallY, W, 70);
+
+  const rim = ctx.createLinearGradient(0, wallY, 0, wallY + 28);
+  rim.addColorStop(0, 'rgba(210,190,140,0.22)');
+  rim.addColorStop(0.5, 'rgba(180,160,120,0.08)');
   rim.addColorStop(1, 'rgba(180,200,255,0)');
   ctx.fillStyle = rim;
-  ctx.fillRect(0, wallY, W, 36);
+  ctx.fillRect(0, wallY, W, 28);
+  // 金线压边
+  ctx.fillStyle = 'rgba(196,164,104,0.35)';
+  ctx.fillRect(0, wallY + 4, W, 2);
 
-  drawWallBricks(wallY, wallH, scroll, 5, 72, 34);
+  drawWallBricks(wallY, wallH, scroll, 6, 70, 32);
   drawMerlons(wallY, scroll, 78);
+
+  // 石柱
+  const colGap = 160;
+  const c0 = Math.floor(scroll / colGap) - 1;
+  const c1 = Math.ceil((scroll + W) / colGap) + 1;
+  for (let ci = c0; ci <= c1; ci++) {
+    const cx = ci * colGap + 20 - scroll;
+    if (cx < -30 || cx > W + 30) continue;
+    ctx.fillStyle = '#2a2434';
+    ctx.fillRect(cx, wallY + 20, 18, GROUND - wallY - 24);
+    ctx.fillStyle = 'rgba(255,230,190,0.08)';
+    ctx.fillRect(cx + 3, wallY + 24, 4, GROUND - wallY - 32);
+    ctx.fillStyle = '#3a3344';
+    ctx.fillRect(cx - 4, wallY + 16, 26, 10);
+    ctx.fillRect(cx - 4, GROUND - 14, 26, 10);
+  }
+
+  // 紫金旗帜
+  const banGap = 200;
+  const b0 = Math.floor(scroll / banGap) - 1;
+  const b1 = Math.ceil((scroll + W) / banGap) + 1;
+  for (let bi = b0; bi <= b1; bi++) {
+    if (brickShade(bi, 4) < 0.35) continue;
+    const bx = bi * banGap + 90 - scroll;
+    if (bx < -20 || bx > W + 20) continue;
+    const sway = Math.sin(animT * 2.2 + bi) * 2.5;
+    drawPurpleBanner(bx, wallY + 28, 70, sway);
+  }
 
   const merlon = 78;
   const m0 = Math.floor(scroll / merlon) - 1;
   const m1 = Math.ceil((scroll + W) / merlon) + 1;
-  ctx.strokeStyle = 'rgba(70,110,80,0.35)';
+  ctx.strokeStyle = 'rgba(70,110,80,0.28)';
   ctx.lineWidth = 2;
   for (let m = m0; m <= m1; m++) {
-    if (brickShade(m, 9) < 0.55) continue;
+    if (brickShade(m, 9) < 0.62) continue;
     const x = m * merlon + 20 - scroll;
     ctx.beginPath();
-    ctx.moveTo(x, wallY + 20);
-    ctx.bezierCurveTo(x + 8, wallY + 50, x - 6, wallY + 90, x + 10, wallY + 130);
+    ctx.moveTo(x, wallY + 36);
+    ctx.bezierCurveTo(x + 8, wallY + 70, x - 6, wallY + 110, x + 10, wallY + 150);
     ctx.stroke();
-    ctx.fillStyle = 'rgba(70,110,80,0.28)';
-    ctx.beginPath(); ctx.ellipse(x + 4, wallY + 48, 5, 3, 0.4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(x - 2, wallY + 86, 4, 2.5, -0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(70,110,80,0.22)';
+    ctx.beginPath(); ctx.ellipse(x + 4, wallY + 64, 5, 3, 0.4, 0, Math.PI * 2); ctx.fill();
   }
 
   const nicheGap = 220;
@@ -2269,101 +2401,142 @@ function drawIndoorHall(scroll) {
   for (let ni = n0; ni <= n1; ni++) {
     const nx = ni * nicheGap + 48 - scroll;
     if (nx < -60 || nx > W + 60) continue;
-    const nw = 40;
-    const nh = 64;
-    const ny = wallY + 48;
+    const nw = 44;
+    const nh = 72;
+    const ny = wallY + 52;
     const cx = nx + nw / 2;
-    const ty = ny + nh - 22;
+    const ty = ny + nh - 24;
 
-    ctx.fillStyle = '#141018';
+    ctx.fillStyle = '#100c18';
     ctx.beginPath();
     ctx.moveTo(nx, ny + nh);
-    ctx.lineTo(nx, ny + 18);
-    ctx.quadraticCurveTo(cx, ny - 8, nx + nw, ny + 18);
+    ctx.lineTo(nx, ny + 20);
+    ctx.quadraticCurveTo(cx, ny - 10, nx + nw, ny + 20);
     ctx.lineTo(nx + nw, ny + nh);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+    ctx.strokeStyle = 'rgba(196,164,104,0.28)';
     ctx.lineWidth = 2;
     ctx.stroke();
-    ctx.fillStyle = 'rgba(255,220,170,0.08)';
-    ctx.fillRect(nx + 3, ny + nh - 8, nw - 6, 5);
+    ctx.fillStyle = 'rgba(255,220,170,0.1)';
+    ctx.fillRect(nx + 4, ny + nh - 10, nw - 8, 6);
 
     const flick = 0.88 + Math.sin(animT * 5 + ni) * 0.08;
-    const wash = ctx.createRadialGradient(cx, ty, 3, cx, ty + 8, 78);
-    wash.addColorStop(0, `rgba(255,150,70,${0.28 * flick})`);
-    wash.addColorStop(0.45, `rgba(255,120,50,${0.1 * flick})`);
+    const wash = ctx.createRadialGradient(cx, ty, 3, cx, ty + 8, 90);
+    wash.addColorStop(0, `rgba(255,160,80,${0.32 * flick})`);
+    wash.addColorStop(0.4, `rgba(255,120,50,${0.12 * flick})`);
     wash.addColorStop(1, 'rgba(255,100,40,0)');
     ctx.fillStyle = wash;
-    ctx.fillRect(cx - 80, wallY, 160, wallH);
+    ctx.fillRect(cx - 90, wallY, 180, wallH);
 
     drawTorch(cx, ty, false, ni);
-    ctx.fillStyle = `rgba(255,170,80,${0.1 + 0.05 * Math.sin(animT * 4 + ni)})`;
+    ctx.fillStyle = `rgba(255,170,80,${0.12 + 0.05 * Math.sin(animT * 4 + ni)})`;
     ctx.beginPath();
-    ctx.ellipse(cx, GROUND - 5, 48, 10, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  const mist = ctx.createLinearGradient(0, GROUND - 70, 0, GROUND);
-  mist.addColorStop(0, 'rgba(30,28,48,0)');
-  mist.addColorStop(1, 'rgba(20,16,32,0.4)');
-  ctx.fillStyle = mist;
-  ctx.fillRect(0, GROUND - 70, W, 70);
-}
-
-function drawOutdoorRampart(scroll) {
-  const hillScroll = scroll * 0.55;
-  ctx.fillStyle = 'rgba(18,22,40,0.55)';
-  for (let i = -1; i < 6; i++) {
-    const hx = i * 180 - (hillScroll % 180);
-    ctx.beginPath();
-    ctx.moveTo(hx, GROUND - 20);
-    ctx.quadraticCurveTo(hx + 50, GROUND - 70 - (i % 3) * 10, hx + 110, GROUND - 24);
-    ctx.quadraticCurveTo(hx + 150, GROUND - 48, hx + 190, GROUND - 18);
-    ctx.lineTo(hx + 190, GROUND);
-    ctx.lineTo(hx, GROUND);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  const wallY = GROUND - 78;
-  const wallH = GROUND - wallY;
-  const wallGrad = ctx.createLinearGradient(0, wallY, 0, GROUND);
-  wallGrad.addColorStop(0, '#3a3348');
-  wallGrad.addColorStop(1, '#2a2432');
-  ctx.fillStyle = wallGrad;
-  ctx.fillRect(0, wallY, W, wallH);
-  drawWallBricks(wallY, wallH, scroll, 2, 72, 30);
-  drawMerlons(wallY, scroll, 78);
-
-  const postGap = 260;
-  const p0 = Math.floor(scroll / postGap) - 1;
-  const p1 = Math.ceil((scroll + W) / postGap) + 1;
-  for (let pi = p0; pi <= p1; pi++) {
-    if (brickShade(pi, 3) < 0.4) continue;
-    const px = pi * postGap + 30 - scroll;
-    ctx.fillStyle = '#2a2430';
-    ctx.fillRect(px, wallY - 52, 8, 52);
-    ctx.fillStyle = '#c45c4a';
-    ctx.beginPath();
-    ctx.moveTo(px + 8, wallY - 50);
-    ctx.lineTo(px + 28, wallY - 44);
-    ctx.lineTo(px + 8, wallY - 38);
-    ctx.closePath();
+    ctx.ellipse(cx, GROUND - 5, 52, 11, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
   const mist = ctx.createLinearGradient(0, GROUND - 90, 0, GROUND);
-  mist.addColorStop(0, 'rgba(40,50,90,0)');
-  mist.addColorStop(1, 'rgba(20,24,48,0.28)');
+  mist.addColorStop(0, 'rgba(30,22,48,0)');
+  mist.addColorStop(1, 'rgba(18,12,28,0.5)');
   ctx.fillStyle = mist;
   ctx.fillRect(0, GROUND - 90, W, 90);
+}
+
+function drawOutdoorRampart(scroll) {
+  // 远山分层
+  const hillScroll = scroll * 0.4;
+  for (let layer = 0; layer < 2; layer++) {
+    const spd = 0.35 + layer * 0.2;
+    const hs = scroll * spd;
+    const alpha = 0.35 + layer * 0.2;
+    ctx.fillStyle = layer === 0 ? `rgba(16,18,36,${alpha})` : `rgba(22,24,44,${alpha})`;
+    const amp = 55 + layer * 18;
+    for (let i = -1; i < 7; i++) {
+      const hx = i * (170 - layer * 20) - (hs % (170 - layer * 20));
+      ctx.beginPath();
+      ctx.moveTo(hx, GROUND - 10);
+      ctx.quadraticCurveTo(hx + 45, GROUND - amp - (i % 3) * 8, hx + 100, GROUND - 18);
+      ctx.quadraticCurveTo(hx + 140, GROUND - amp * 0.55, hx + 180, GROUND - 12);
+      ctx.lineTo(hx + 180, GROUND);
+      ctx.lineTo(hx, GROUND);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  const wallY = GROUND - 110;
+  const wallH = GROUND - wallY;
+  const wallGrad = ctx.createLinearGradient(0, wallY, 0, GROUND);
+  wallGrad.addColorStop(0, '#3c354c');
+  wallGrad.addColorStop(0.5, '#342c3e');
+  wallGrad.addColorStop(1, '#2a2434');
+  ctx.fillStyle = wallGrad;
+  ctx.fillRect(0, wallY, W, wallH);
+  drawWallBricks(wallY, wallH, scroll, 3, 70, 30);
+  drawMerlons(wallY, scroll, 78);
+
+  // 拱窗暖光
+  const winGap = 120;
+  const w0 = Math.floor(scroll / winGap) - 1;
+  const w1 = Math.ceil((scroll + W) / winGap) + 1;
+  for (let wi = w0; wi <= w1; wi++) {
+    if (brickShade(wi, 2) < 0.45) continue;
+    const wx = wi * winGap + 40 - scroll;
+    if (wx < -20 || wx > W + 20) continue;
+    const wy = wallY + 28;
+    ctx.fillStyle = '#14101c';
+    ctx.beginPath();
+    ctx.moveTo(wx, wy + 28);
+    ctx.lineTo(wx, wy + 10);
+    ctx.quadraticCurveTo(wx + 10, wy - 2, wx + 20, wy + 10);
+    ctx.lineTo(wx + 20, wy + 28);
+    ctx.closePath();
+    ctx.fill();
+    const flick = 0.75 + Math.sin(animT * 3 + wi) * 0.15;
+    ctx.fillStyle = `rgba(255,180,90,${0.35 * flick})`;
+    ctx.fillRect(wx + 3, wy + 8, 14, 16);
+    ctx.fillStyle = `rgba(255,200,120,${0.12 * flick})`;
+    ctx.beginPath();
+    ctx.ellipse(wx + 10, wy + 18, 22, 16, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 旗杆 + 旗
+  const postGap = 240;
+  const p0 = Math.floor(scroll / postGap) - 1;
+  const p1 = Math.ceil((scroll + W) / postGap) + 1;
+  for (let pi = p0; pi <= p1; pi++) {
+    if (brickShade(pi, 3) < 0.3) continue;
+    const px = pi * postGap + 30 - scroll;
+    ctx.fillStyle = '#2e2838';
+    ctx.fillRect(px, wallY - 64, 7, 64);
+    ctx.fillStyle = '#3a3344';
+    ctx.fillRect(px - 2, wallY - 68, 11, 6);
+    const sway = Math.sin(animT * 2.4 + pi) * 3;
+    ctx.fillStyle = '#5a2a48';
+    ctx.beginPath();
+    ctx.moveTo(px + 7, wallY - 60);
+    ctx.lineTo(px + 34 + sway, wallY - 52);
+    ctx.lineTo(px + 7, wallY - 42);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(220,170,90,0.35)';
+    ctx.fillRect(px + 8, wallY - 56, 10, 2);
+  }
+
+  const mist = ctx.createLinearGradient(0, GROUND - 110, 0, GROUND);
+  mist.addColorStop(0, 'rgba(40,45,80,0)');
+  mist.addColorStop(0.55, 'rgba(30,28,50,0.15)');
+  mist.addColorStop(1, 'rgba(18,16,32,0.4)');
+  ctx.fillStyle = mist;
+  ctx.fillRect(0, GROUND - 110, W, 110);
 }
 
 // 室内↔室外交界拱门：中间开口，两侧石柱
 function drawTransitionGate(sx, toOutdoor) {
   if (sx < -80 || sx > W + 80) return;
-  const wallY = GROUND - 218;
+  const wallY = GROUND - 232;
   const archW = 70;
   const x0 = sx - archW / 2;
   const x1 = sx + archW / 2;
@@ -2499,71 +2672,77 @@ function drawCastleLayer(parallax, baseY, alpha, fill) {
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.fillStyle = fill;
-  // 连续地平线底座，避免塔楼之间透出黑缝
   for (let bx = off - period; bx < W + period; bx += period) {
     ctx.fillRect(bx, baseY - 18, period + 2, 22);
   }
   for (let bx = off - period; bx < W + period; bx += period) {
-    ctx.fillRect(bx + 24, baseY - 88, 42, 88);
-    ctx.fillRect(bx + 18, baseY - 98, 10, 10);
-    ctx.fillRect(bx + 34, baseY - 98, 10, 10);
-    ctx.fillRect(bx + 50, baseY - 98, 10, 10);
-    ctx.fillRect(bx + 100, baseY - 124, 52, 124);
+    // 主塔
+    ctx.fillStyle = fill;
+    ctx.fillRect(bx + 24, baseY - 96, 44, 96);
+    ctx.fillRect(bx + 18, baseY - 106, 12, 12);
+    ctx.fillRect(bx + 36, baseY - 106, 12, 12);
+    ctx.fillRect(bx + 54, baseY - 106, 12, 12);
+    // 尖顶大塔
+    ctx.fillRect(bx + 100, baseY - 138, 56, 138);
     ctx.beginPath();
-    ctx.moveTo(bx + 96, baseY - 124);
-    ctx.lineTo(bx + 126, baseY - 158);
-    ctx.lineTo(bx + 156, baseY - 124);
+    ctx.moveTo(bx + 94, baseY - 138);
+    ctx.lineTo(bx + 128, baseY - 178);
+    ctx.lineTo(bx + 162, baseY - 138);
     ctx.closePath();
     ctx.fill();
-    ctx.fillRect(bx + 98, baseY - 134, 12, 10);
-    ctx.fillRect(bx + 120, baseY - 134, 12, 10);
-    ctx.fillRect(bx + 142, baseY - 134, 12, 10);
-    ctx.fillRect(bx + 178, baseY - 70, 34, 70);
-    ctx.fillRect(bx + 174, baseY - 78, 8, 8);
-    ctx.fillRect(bx + 190, baseY - 78, 8, 8);
-    ctx.fillRect(bx + 206, baseY - 78, 8, 8);
-    // 塔间火桩填缝
-    ctx.fillRect(bx + 66, baseY - 36, 34, 36);
-    ctx.fillRect(bx + 152, baseY - 28, 26, 28);
-    ctx.fillRect(bx + 212, baseY - 24, period - 212, 24);
-    ctx.fillStyle = 'rgba(255,170,90,0.12)';
-    ctx.fillRect(bx + 118, baseY - 70, 8, 14);
-    ctx.fillRect(bx + 136, baseY - 70, 8, 14);
+    ctx.fillRect(bx + 102, baseY - 148, 12, 10);
+    ctx.fillRect(bx + 122, baseY - 148, 12, 10);
+    ctx.fillRect(bx + 142, baseY - 148, 12, 10);
+    // 侧塔
+    ctx.fillRect(bx + 178, baseY - 78, 36, 78);
+    ctx.fillRect(bx + 174, baseY - 88, 10, 10);
+    ctx.fillRect(bx + 190, baseY - 88, 10, 10);
+    ctx.fillRect(bx + 206, baseY - 88, 10, 10);
+    // 填缝建筑
+    ctx.fillRect(bx + 66, baseY - 42, 34, 42);
+    ctx.fillRect(bx + 152, baseY - 32, 26, 32);
+    ctx.fillRect(bx + 214, baseY - 28, period - 214, 28);
+    // 窗灯
+    ctx.fillStyle = 'rgba(255,180,90,0.22)';
+    ctx.fillRect(bx + 34, baseY - 70, 7, 11);
+    ctx.fillRect(bx + 118, baseY - 90, 8, 14);
+    ctx.fillRect(bx + 138, baseY - 90, 8, 14);
+    ctx.fillRect(bx + 188, baseY - 55, 6, 10);
     ctx.fillStyle = fill;
   }
   ctx.restore();
 }
 
 function drawBackground() {
-  if (_bgCacheFrame % 3 === 0 || bonusActive) {
-    const hueShift = Math.sin(animT * 0.25) * 0.5 + 0.5;
+  // 奖励空间与日常共用跑酷走廊；仅用暖金氛围区分（不再换整张金库立绘）
+  if (_bgCacheFrame % 3 === 0) {
     _bgGrad = ctx.createLinearGradient(0, 0, 0, H);
     if (bonusActive) {
-      _bgGrad.addColorStop(0, `hsl(${270 + hueShift * 10}, 70%, 42%)`);
-      _bgGrad.addColorStop(0.35, `hsl(${300 + hueShift * 8}, 75%, 55%)`);
-      _bgGrad.addColorStop(0.65, `hsl(${45 + hueShift * 6}, 85%, 62%)`);
-      _bgGrad.addColorStop(1, `hsl(${200 + hueShift * 5}, 60%, 48%)`);
-      const glowA = 0.45 + 0.25 * Math.sin(animT * 0.8);
-      _bgGlow1 = ctx.createRadialGradient(W * 0.5, 120, 10, W * 0.5, 120, 320);
-      _bgGlow1.addColorStop(0, `rgba(255,255,200,${glowA})`);
-      _bgGlow1.addColorStop(1, 'rgba(255,255,200,0)');
-      const glowB = 0.35 + 0.2 * Math.sin(animT * 0.6 + 1.2);
-      _bgGlow2 = ctx.createRadialGradient(W * 0.2, GROUND - 60, 10, W * 0.2, GROUND - 60, 280);
-      _bgGlow2.addColorStop(0, `rgba(180,120,255,${glowB})`);
-      _bgGlow2.addColorStop(1, 'rgba(180,120,255,0)');
+      _bgGrad.addColorStop(0, '#141a32');
+      _bgGrad.addColorStop(0.3, '#222850');
+      _bgGrad.addColorStop(0.6, '#3a3358');
+      _bgGrad.addColorStop(0.85, '#4a3a48');
+      _bgGrad.addColorStop(1, '#4a3840');
+      _bgGlow1 = ctx.createRadialGradient(W * 0.72, 70, 8, W * 0.72, 100, 280);
+      _bgGlow1.addColorStop(0, 'rgba(255,230,160,0.45)');
+      _bgGlow1.addColorStop(0.4, 'rgba(255,200,120,0.12)');
+      _bgGlow1.addColorStop(1, 'rgba(180,120,60,0)');
+      _bgGlow2 = ctx.createRadialGradient(W * 0.35, GROUND - 10, 10, W * 0.35, GROUND, 280);
+      _bgGlow2.addColorStop(0, 'rgba(255,190,90,0.2)');
+      _bgGlow2.addColorStop(1, 'rgba(120,60,40,0)');
     } else {
-      // 月夜户外天空
-      _bgGrad.addColorStop(0, '#1a2040');
-      _bgGrad.addColorStop(0.35, '#2a3358');
-      _bgGrad.addColorStop(0.7, '#3d3550');
-      _bgGrad.addColorStop(1, '#3a3348');
-      _bgGlow1 = ctx.createRadialGradient(W * 0.78, 70, 8, W * 0.78, 90, 220);
-      _bgGlow1.addColorStop(0, 'rgba(255,245,210,0.35)');
-      _bgGlow1.addColorStop(0.5, 'rgba(200,210,255,0.08)');
-      _bgGlow1.addColorStop(1, 'rgba(200,210,255,0)');
-      _bgGlow2 = ctx.createRadialGradient(W * 0.35, GROUND - 30, 10, W * 0.35, GROUND - 10, 280);
-      _bgGlow2.addColorStop(0, 'rgba(255,150,70,0.14)');
-      _bgGlow2.addColorStop(1, 'rgba(255,150,70,0)');
+      _bgGrad.addColorStop(0, '#12182e');
+      _bgGrad.addColorStop(0.28, '#1c2448');
+      _bgGrad.addColorStop(0.55, '#2a2a52');
+      _bgGrad.addColorStop(0.78, '#3a3358');
+      _bgGrad.addColorStop(1, '#3a3048');
+      _bgGlow1 = ctx.createRadialGradient(W * 0.76, 64, 6, W * 0.76, 90, 260);
+      _bgGlow1.addColorStop(0, 'rgba(255,245,210,0.42)');
+      _bgGlow1.addColorStop(0.35, 'rgba(200,190,255,0.12)');
+      _bgGlow1.addColorStop(1, 'rgba(120,100,200,0)');
+      _bgGlow2 = ctx.createRadialGradient(W * 0.3, GROUND - 20, 10, W * 0.3, GROUND, 300);
+      _bgGlow2.addColorStop(0, 'rgba(255,140,70,0.16)');
+      _bgGlow2.addColorStop(1, 'rgba(80,40,100,0)');
     }
   }
   _bgCacheFrame++;
@@ -2572,90 +2751,48 @@ function drawBackground() {
   ctx.fillRect(0, 0, W, H);
   if (_bgGlow1) {
     ctx.fillStyle = _bgGlow1;
-    ctx.fillRect(0, 0, W, bonusActive ? 400 : GROUND);
+    ctx.fillRect(0, 0, W, GROUND);
   }
-  if (!bonusActive) {
-    const outOpen = 1 - bgEnclosure();
-    // 星点（室内时淡出）
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    for (let i = 0; i < 18; i++) {
-      const sx = ((i * 97 + worldX * 0.02) % W + W) % W;
-      const sy = 18 + (i * 37) % 120;
-      const tw = 0.35 + 0.65 * Math.abs(Math.sin(animT * 1.4 + i));
-      ctx.globalAlpha = tw * 0.7 * (0.25 + 0.75 * outOpen);
-      ctx.fillRect(sx, sy, 2, 2);
-    }
-    ctx.globalAlpha = 1;
-    // 月亮
-    const moonX = W * 0.78;
-    const moonY = 68;
-    ctx.globalAlpha = 0.35 + 0.65 * outOpen;
-    ctx.fillStyle = 'rgba(255,248,220,0.9)';
-    ctx.beginPath(); ctx.arc(moonX, moonY, 22, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(26,32,64,0.55)';
-    ctx.beginPath(); ctx.arc(moonX - 8, moonY - 4, 18, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1;
-  } else {
-    // 奖励空间：天空光柱，不落在跑道上（避免地面椭圆遮挡）
-    ctx.save();
-    for (let i = 0; i < 5; i++) {
-      const bx = (i * 180 - (worldX * 0.05) % 180) % (W + 180) - 40;
-      const cx = bx + 60;
-      const top = 24;
-      const bot = GROUND - 110;
-      const beam = ctx.createLinearGradient(cx, top, cx, bot);
-      beam.addColorStop(0, 'rgba(255,255,255,0.28)');
-      beam.addColorStop(0.55, 'rgba(255,255,255,0.08)');
-      beam.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = beam;
-      ctx.fillRect(cx - 7, top, 14, bot - top);
-      ctx.fillStyle = i % 2 === 0 ? 'rgba(155,123,255,0.18)' : 'rgba(255,179,71,0.18)';
-      ctx.beginPath();
-      ctx.ellipse(cx, 88 + (i % 3) * 36, 36, 12, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
+
+  const outOpen = 1 - bgEnclosure();
+  for (let i = 0; i < 28; i++) {
+    const sx = ((i * 97 + worldX * 0.02) % W + W) % W;
+    const sy = 14 + (i * 41) % 130;
+    const tw = 0.35 + 0.65 * Math.abs(Math.sin(animT * 1.4 + i));
+    const sz = 1 + (i % 3 === 0 ? 1 : 0);
+    ctx.globalAlpha = tw * 0.75 * (0.2 + 0.8 * outOpen);
+    ctx.fillStyle = bonusActive
+      ? (i % 4 === 0 ? 'rgba(255,220,140,0.95)' : 'rgba(255,255,240,0.8)')
+      : (i % 5 === 0 ? 'rgba(255,230,180,0.95)' : 'rgba(255,255,255,0.85)');
+    ctx.fillRect(sx, sy, sz, sz);
   }
+  ctx.globalAlpha = 1;
+
+  const moonX = W * 0.76;
+  const moonY = 64;
+  ctx.globalAlpha = 0.3 + 0.7 * outOpen;
+  const halo = ctx.createRadialGradient(moonX, moonY, 8, moonX, moonY, bonusActive ? 80 : 70);
+  halo.addColorStop(0, bonusActive ? 'rgba(255,230,160,0.42)' : 'rgba(255,245,210,0.35)');
+  halo.addColorStop(1, bonusActive ? 'rgba(255,180,80,0)' : 'rgba(180,170,255,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(moonX, moonY, bonusActive ? 80 : 70, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,248,220,0.95)';
+  ctx.beginPath(); ctx.arc(moonX, moonY, bonusActive ? 26 : 24, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(26,32,64,0.5)';
+  ctx.beginPath(); ctx.arc(moonX - 9, moonY - 4, 19, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 1;
+
   if (_bgGlow2) {
     ctx.fillStyle = _bgGlow2;
     ctx.fillRect(0, GROUND - 180, W, 200);
   }
 
-  if (!bonusActive) {
-    drawCastleCorridor();
-  } else {
-    const moonX = W * 0.76 + Math.sin(animT * 0.15) * 6;
-    const moonY = 72 + Math.cos(animT * 0.12) * 4;
-    ctx.fillStyle = 'rgba(255,248,220,0.92)';
-    ctx.beginPath(); ctx.arc(moonX, moonY, 28, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(200,210,240,0.35)';
-    ctx.beginPath(); ctx.arc(moonX - 10, moonY - 6, 24, 0, Math.PI * 2); ctx.fill();
-  }
-
-  for (const s of bgShapes) {
-    if (!bonusActive) continue;
-    let sx = s.x - ((worldX * s.speed) % (W + 80));
-    if (sx < -60) sx += W + 80;
-    if (sx > W + 60) sx -= W + 80;
-
-    if (s.type === 'dot') {
-      const tw = 0.35 + 0.65 * Math.abs(Math.sin(animT * 1.5 + s.phase));
-      ctx.globalAlpha = tw;
-      ctx.fillStyle = s.color;
-      ctx.fillRect(sx, s.y, s.size, s.size);
-    } else if (s.type === 'particle') {
-      let py = s.y - ((animT * s.vy) % (H + 20));
-      if (py < -10) py += H + 20;
-      const al = 0.2 + 0.55 * Math.abs(Math.sin(animT * 1.4 + s.phase));
-      ctx.globalAlpha = al;
-      ctx.fillStyle = s.color;
-      const breathe = 0.85 + 0.15 * Math.sin(animT * 1.2 + s.phase);
-      ctx.beginPath();
-      ctx.arc(sx, py, s.size * breathe, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-  ctx.globalAlpha = 1;
+  drawCastleCorridor();
+  const vig = ctx.createRadialGradient(W * 0.5, GROUND * 0.45, 120, W * 0.5, GROUND * 0.5, 520);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, bonusActive ? 'rgba(40,24,8,0.22)' : 'rgba(8,6,16,0.28)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, W, GROUND);
 }
 
 // ===================== 实体渲染 =====================
@@ -2671,25 +2808,33 @@ function brickShade(col, row) {
 }
 
 function drawBrickFace(x, y, w, h, tone) {
-  // tone 0..1 → 略深/略浅的石砖（提亮，避免看起来像黑块）
-  const base = 68 + tone * 22;
-  const r = (base * 0.92) | 0;
+  // tone 0..1 → 略深/略浅的石砖（提亮，带一点紫灰古堡色）
+  const base = 72 + tone * 24;
+  const r = (base * 0.94) | 0;
   const g = (base * 0.86) | 0;
-  const b = (base * 0.9) | 0;
+  const b = (base * 0.96) | 0;
   ctx.fillStyle = `rgb(${r},${g},${b})`;
   ctx.fillRect(x, y, w, h);
-  // 顶沿亮、底沿暗
-  ctx.fillStyle = `rgba(210,190,170,${0.10 + tone * 0.06})`;
+  ctx.fillStyle = `rgba(220,200,170,${0.11 + tone * 0.06})`;
   ctx.fillRect(x, y, w, 2);
-  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.fillStyle = 'rgba(0,0,0,0.26)';
   ctx.fillRect(x, y + h - 2, w, 2);
-  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
   ctx.fillRect(x + w - 2, y + 2, 2, h - 4);
-  // 轻微磨损点
   if (tone > 0.55) {
     ctx.fillStyle = 'rgba(0,0,0,0.12)';
     ctx.fillRect(x + w * 0.3, y + h * 0.45, 3, 2);
+  } else if (tone < 0.25) {
+    ctx.fillStyle = 'rgba(196,164,104,0.1)';
+    ctx.fillRect(x + 3, y + 3, Math.max(4, w * 0.25), 2);
   }
+}
+
+function brickOverlapsGap(x, w) {
+  for (const g of gaps) {
+    if (x + w > g.x && x < g.x + g.w) return true;
+  }
+  return false;
 }
 
 function drawGround() {
@@ -2717,26 +2862,137 @@ function drawGround() {
       const worldLeft = col * stepX + rowShift;
       const x = worldLeft - scroll;
       if (x > W + stepX || x < -stepX) continue;
+      // 坑口留给 drawGaps 画纵深，地面砖不盖坑
+      if (brickOverlapsGap(x, bw)) continue;
       drawBrickFace(x, y, bw, bh, brickShade(col, row));
     }
   }
   ctx.restore();
 
-  // 顶沿线
-  ctx.fillStyle = 'rgba(180,160,130,0.22)';
-  ctx.fillRect(0, GROUND, W, 2);
-  ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.fillRect(0, GROUND + 2, W, 2);
+  // 顶沿线（坑口打断）
+  for (let x = 0; x < W; ) {
+    let skip = null;
+    for (const g of gaps) {
+      if (g.x + g.w > x && g.x < W) {
+        if (skip == null || g.x < skip.x) skip = g;
+      }
+    }
+    if (skip && skip.x <= x && skip.x + skip.w > x) {
+      x = skip.x + skip.w;
+      continue;
+    }
+    const x1 = skip && skip.x > x ? Math.min(W, skip.x) : W;
+    const ww = x1 - x;
+    if (ww > 0) {
+      ctx.fillStyle = 'rgba(180,160,130,0.22)';
+      ctx.fillRect(x, GROUND, ww, 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(x, GROUND + 2, ww, 2);
+    }
+    x = x1;
+  }
 }
 
+/** 坑内：把室内墙砖背景往下扩图，再加轻纵深与断崖沿（不再画发黑肋条远墙） */
 function drawGaps() {
+  const depth = Math.max(H - GROUND + 8, GAP_DEPTH);
+  // 与 drawCastleCorridor / drawIndoorHall 同相位，砖缝对齐
+  const scroll = worldX * 0.2;
+  const stepX = 72;
+  const stepY = 34;
+
   for (const g of gaps) {
-    const pitGrad = ctx.createLinearGradient(g.x, GROUND, g.x, H);
-    pitGrad.addColorStop(0, '#0a0610');
-    pitGrad.addColorStop(0.4, '#140c1a');
-    pitGrad.addColorStop(1, '#000');
-    ctx.fillStyle = pitGrad;
-    ctx.fillRect(g.x, GROUND, g.w, H - GROUND);
+    if (g.x > W + 40 || g.x + g.w < -40) continue;
+    const x0 = g.x;
+    const x1 = g.x + g.w;
+    const mid = (x0 + x1) * 0.5;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x0, GROUND - 2, g.w, depth + 2);
+    ctx.clip();
+
+    // 1) 墙色底，接上室内墙
+    const wallGrad = ctx.createLinearGradient(0, GROUND, 0, GROUND + depth);
+    wallGrad.addColorStop(0, '#342c3c');
+    wallGrad.addColorStop(0.5, '#2c2432');
+    wallGrad.addColorStop(1, '#221c28');
+    ctx.fillStyle = wallGrad;
+    ctx.fillRect(x0, GROUND, g.w, depth);
+
+    // 2) 背景墙砖扩进坑（参数对齐 drawWallBricks）
+    const rows = Math.ceil(depth / stepY) + 2;
+    for (let row = 0; row < rows; row++) {
+      const y = GROUND + 8 + row * stepY;
+      const rowShift = (row & 1) ? stepX * 0.5 : 0;
+      const deep = Math.min(1, row / Math.max(1, rows - 1));
+      const col0 = Math.floor((scroll - rowShift) / stepX) - 1;
+      const col1 = Math.ceil((scroll - rowShift + W) / stepX) + 1;
+      for (let col = col0; col <= col1; col++) {
+        const x = col * stepX + rowShift - scroll;
+        if (x + stepX < x0 - 4 || x > x1 + 4) continue;
+        const t = brickShade(col, row + 31);
+        const bw = stepX - 5 - (t > 0.7 ? 8 : 0);
+        const bh = stepY - 5;
+        const lum = 48 + t * 16 - deep * 8;
+        ctx.fillStyle = `rgb(${(lum * 0.95) | 0},${(lum * 0.88) | 0},${(lum * 1.02) | 0})`;
+        ctx.fillRect(x + 2, y, bw, bh);
+        ctx.fillStyle = 'rgba(255,240,220,0.06)';
+        ctx.fillRect(x + 2, y, bw, 3);
+        ctx.fillStyle = 'rgba(0,0,0,0.18)';
+        ctx.fillRect(x + 2, y + bh - 3, bw, 3);
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        ctx.fillRect(x + 2, y + 3, 3, bh - 6);
+        if (t > 0.82) {
+          ctx.strokeStyle = 'rgba(20,14,28,0.35)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(x + bw * 0.35, y + 6);
+          ctx.lineTo(x + bw * 0.42, y + bh * 0.55);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // 3) 轻纵深（保留落坑可读，不再盖成黑坑）
+    const depthShade = ctx.createLinearGradient(mid, GROUND, mid, GROUND + depth);
+    depthShade.addColorStop(0, 'rgba(0,0,0,0.1)');
+    depthShade.addColorStop(0.5, 'rgba(0,0,0,0.22)');
+    depthShade.addColorStop(1, 'rgba(0,0,0,0.48)');
+    ctx.fillStyle = depthShade;
+    ctx.fillRect(x0, GROUND, g.w, depth);
+
+    // 4) 左右断崖近景砖柱
+    const sideW = Math.min(22, Math.max(12, g.w * 0.2));
+    const sideRows = Math.ceil(depth / GROUND_BRICK_H) + 1;
+    for (let row = 0; row < sideRows; row++) {
+      const y = GROUND + GROUND_MORTAR + row * GROUND_BRICK_H;
+      drawBrickFace(x0, y, sideW, GROUND_BRICK_H - GROUND_MORTAR, 0.4 + brickShade(row, 3) * 0.35);
+      drawBrickFace(x1 - sideW, y, sideW, GROUND_BRICK_H - GROUND_MORTAR, 0.35 + brickShade(row, 7) * 0.35);
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.fillRect(x0 + sideW - 2, GROUND, 4, depth);
+    ctx.fillRect(x1 - sideW - 2, GROUND, 4, depth);
+
+    // 5) 坑口破碎沿
+    ctx.fillStyle = '#6a5f68';
+    ctx.fillRect(x0 - 4, GROUND - 6, 10, 8);
+    ctx.fillRect(x1 - 6, GROUND - 6, 10, 8);
+    ctx.fillStyle = '#4a424c';
+    ctx.fillRect(x0 + 2, GROUND - 2, 8, 5);
+    ctx.fillRect(x1 - 10, GROUND - 2, 8, 5);
+    ctx.fillStyle = 'rgba(210,180,140,0.2)';
+    ctx.fillRect(x0 - 4, GROUND - 6, 10, 2);
+    ctx.fillRect(x1 - 6, GROUND - 6, 10, 2);
+
+    // 6) 口部轻暗角
+    const lip = ctx.createLinearGradient(mid, GROUND - 2, mid, GROUND + 22);
+    lip.addColorStop(0, 'rgba(0,0,0,0.35)');
+    lip.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = lip;
+    ctx.fillRect(x0, GROUND - 2, g.w, 24);
+
+    ctx.restore();
   }
 }
 
@@ -2848,7 +3104,7 @@ function drawSpikes() {
     const spikeH = SPIKE_H;
     for (let i = 0; i < spikeCount; i++) {
       const sx = s.x + 4 + i * 12 + 5;
-      if (drawWorldSprite(WORLD_ASSETS.spike, sx, GROUND - 8, spikeH, 'feet')) continue;
+      if (drawWorldSprite(WORLD_ASSETS.spike, sx, GROUND - 8, 34, 'feet')) continue;
       const base = s.x + 4 + i * 12;
       ctx.fillStyle = '#8a9098';
       ctx.strokeStyle = '#2a2228';
@@ -2948,6 +3204,22 @@ function drawOrbitOrbs() {
   }
 }
 
+function drawMonsterIdleFrame(cx, groundY, mh, phase) {
+  const sheet = WORLD_ASSETS.monsterWalk;
+  if (!sheet?.ready || !sheet.img) return false;
+  const frames = ensureSheetFrames(sheet);
+  if (!frames?.length) return false;
+  // idle 呼吸略慢于旧行走表
+  const idx = Math.floor((animT * 3.2 + phase) % frames.length);
+  const frame = frames[idx];
+  const img = sheet.img;
+  const scale = mh / Math.max(1, frame.h);
+  const dw = frame.w * scale;
+  const dh = frame.h * scale;
+  ctx.drawImage(img, frame.left, frame.top, frame.w, frame.h, cx - dw / 2, groundY - dh, dw, dh);
+  return true;
+}
+
 function drawMonsters() {
   for (const mo of monsters) {
     const mh = mo.big ? 2 * U : 1 * U;
@@ -2955,6 +3227,7 @@ function drawMonsters() {
     const cx = mo.x + mw / 2;
     const bob = Math.abs(Math.sin(animT * 2.5 + mo.phase)) * 4;
     const cy = GROUND - mh / 2 - bob;
+    if (!mo.big && drawMonsterIdleFrame(cx, GROUND - bob, mh, mo.phase)) continue;
     const asset = mo.big ? WORLD_ASSETS.monsterBig : WORLD_ASSETS.monster;
     const drew = drawWorldSprite(asset, cx, GROUND - bob, mh, 'feet');
     if (!drew) {
@@ -2991,45 +3264,28 @@ function drawMonsters() {
 function drawSwordSwings() {
   if (!isWarrior()) return;
   const fy = GROUND - px - U * (ducking ? 0.5 : 1);
-  const ax = CHAR_X + CHAR_W / 2 + 6;
-  const ay = fy - 22;
-  const slashP = warriorSlashT > 0 ? (1 - warriorSlashT / SWORD_SLASH_DUR) : 0;
+  const ax = CHAR_X + CHAR_W / 2 + 10;
+  const ay = fy - 18;
   for (const sw of swordSwings) {
     const dur = sw.dur || SWORD_SLASH_DUR;
     const p = 1 - sw.t / dur;
-    const alpha = Math.min(1, sw.t / dur) * 0.95;
-    const arcR = sw.range * 0.72;
-    const startA = -1.15 + p * 0.25;
-    const endA = 0.15 + p * 1.05;
+    const alpha = Math.min(1, sw.t / dur) * 0.9;
+    // 下劈弧：从右上扫到右下
+    const arcR = sw.range * 0.58;
+    const startA = -1.35 + p * 0.15;
+    const endA = -0.15 + p * 0.95;
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.strokeStyle = '#e8f4ff';
-    ctx.lineWidth = 5 + p * 3;
+    ctx.strokeStyle = '#f2f7ff';
+    ctx.lineWidth = 4 + p * 2.5;
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.arc(ax, ay, arcR, startA, endA);
     ctx.stroke();
-    ctx.strokeStyle = `rgba(255,255,255,${0.35 + p * 0.45})`;
+    ctx.strokeStyle = `rgba(200,180,255,${0.35 + p * 0.4})`;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(ax, ay, arcR * 0.88, startA + 0.1, endA - 0.05);
-    ctx.stroke();
-    ctx.fillStyle = `rgba(180,210,255,${0.12 + p * 0.2})`;
-    ctx.beginPath();
-    ctx.arc(ax, ay, arcR * 0.82, startA, endA);
-    ctx.lineTo(ax, ay);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  }
-  if (slashP > 0.05) {
-    ctx.save();
-    ctx.globalAlpha = 0.5 * Math.sin(slashP * Math.PI);
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(ax + 4, ay - 4);
-    ctx.lineTo(ax + (swordSwings[0]?.range || swordRange()) * 0.55 * slashP, ay - 18 - slashP * 10);
+    ctx.arc(ax, ay, arcR * 0.9, startA + 0.08, endA - 0.04);
     ctx.stroke();
     ctx.restore();
   }
@@ -3109,7 +3365,7 @@ function drawCoins() {
     if (c.taken) continue;
     const bob = Math.sin(animT * 3 + c.bob) * 4;
     const cy = c.y + bob;
-    if (drawWorldSprite(WORLD_ASSETS.coin, c.x, cy, COIN_R * 2.2, 'center')) continue;
+    if (drawWorldSprite(WORLD_ASSETS.coin, c.x, cy, COIN_DRAW_H, 'center')) continue;
     const spin = Math.abs(Math.cos(animT * 4 + c.bob));
     const rx = COIN_R * (0.3 + spin * 0.7);
     ctx.fillStyle = '#ffd93d';
@@ -3196,10 +3452,11 @@ function drawRollSheetSprite(cx, cy, pick) {
   const img = sheet.img;
   if (!img || !frame) return false;
   // 与跑步同一比例尺，脚底贴地；翻滚姿势本身可变矮
-  let scale = charBodyScale(charId);
+  const targetH = CHAR_H_DUCK * 1.35;
+  let scale = targetH / Math.max(1, frame.h);
   let dw = frame.w * scale;
   let dh = frame.h * scale;
-  const maxH = CHAR_H_STAND * 1.06;
+  const maxH = CHAR_H_STAND * 0.95;
   if (dh > maxH) {
     const k = maxH / dh;
     scale *= k;
@@ -3231,21 +3488,51 @@ function drawPlayerBuffAuras(cx, cy, bob) {
   if (puTimers.attack > 0) {
     artFillCircle(ctx, cx, cy - 32 + bob, 42, `rgba(255,107,53,${0.12 + Math.sin(animT * 8) * 0.06})`);
   }
-  if (itemShield > 0) {
-    ctx.fillStyle = 'rgba(132,94,194,0.2)';
+  const shieldStacks = (itemShield > 0 ? itemShield : 0) + (shield > 0 ? shield : 0);
+  if (shieldStacks > 0) {
+    ctx.fillStyle = 'rgba(132,94,194,0.22)';
+    ctx.strokeStyle = 'rgba(180,220,255,0.55)';
+    ctx.lineWidth = 2;
     for (let i = 0; i < 5; i++) {
       const a = animT * 2.8 + i * 1.25;
-      artCircle(ctx, cx + Math.cos(a) * 34, cy - 34 + bob + Math.sin(a * 1.3) * 12, 3.5);
+      const ox = cx + Math.cos(a) * 34;
+      const oy = cy - 28 + bob + Math.sin(a * 1.3) * 10;
+      artCircle(ctx, ox, oy, 3.5 + Math.min(2, shieldStacks - 1));
       ctx.fill();
+      ctx.stroke();
     }
   }
 }
 
 function drawPlayer() {
+  // 吸入传送门：角色飞向旋涡并缩小旋转
+  if (portalSuck) {
+    const u = Math.min(1, portalSuck.t / PORTAL_SUCK_DUR);
+    const ease = 1 - Math.pow(1 - u, 3);
+    const cx = portalSuck.fromX + (portalSuck.toX - portalSuck.fromX) * ease;
+    const cy = portalSuck.fromY + (portalSuck.toY - portalSuck.fromY) * ease;
+    const scale = 1 - ease * 0.72;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(ease * Math.PI * 3.2);
+    ctx.scale(scale, scale);
+    ctx.translate(-cx, -cy);
+    ctx.globalAlpha = 1 - ease * 0.55;
+    const sprite = pickCharSprite(isWarrior() ? 'warrior' : 'mage');
+    if (sprite) drawCharSprite(cx, cy + CHAR_H_STAND * 0.5, 0, 1, sprite);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    return;
+  }
+
   const cx = CHAR_X;
-  const cy = GROUND - px;
+  // 翻滚贴地：视觉 cy 锁在当前地面层
+  const footY = rollTimer > 0 ? (onPlatformY || 0) : px;
+  const cy = GROUND - footY;
 
   if (rollTimer > 0) {
+    const bob = 0;
+    drawPlayerBuffAuras(cx, cy, bob); // 翻滚时也显示护盾等光环
     drawPlayerRoll(cx, cy);
     return;
   }
@@ -3451,23 +3738,83 @@ function drawMilestone() {
   ctx.restore();
 }
 
+function drawMotionStreaks(intensity, opts = {}) {
+  // 水平拖影速度线：边缘渐隐，避免整屏斜黄杠
+  const count = opts.count ?? 10;
+  const speed = opts.speed ?? 520;
+  const y0 = opts.y0 ?? 36;
+  const y1 = opts.y1 ?? GROUND - 24;
+  const warm = opts.warm !== false;
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (let i = 0; i < count; i++) {
+    const t = (i + 1) / (count + 1);
+    const yy = y0 + (y1 - y0) * t + Math.sin(animT * 1.7 + i * 1.9) * 5;
+    const len = (opts.minLen ?? 48) + (i % 5) * (opts.lenStep ?? 18) + Math.sin(animT * 3 + i) * 8;
+    const off = (animT * speed + i * 97) % (W + len);
+    const x1 = W + 20 - off;
+    const x0 = x1 - len;
+    const a = intensity * (0.22 + 0.55 * Math.abs(Math.sin(i * 1.3 + animT * 2)));
+    const grad = ctx.createLinearGradient(x0, yy, x1, yy);
+    grad.addColorStop(0, 'rgba(255,255,255,0)');
+    if (warm) {
+      grad.addColorStop(0.35, `rgba(255,236,190,${a * 0.35})`);
+      grad.addColorStop(0.7, `rgba(255,248,230,${a})`);
+    } else {
+      grad.addColorStop(0.4, `rgba(220,235,255,${a * 0.4})`);
+      grad.addColorStop(0.75, `rgba(255,255,255,${a})`);
+    }
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = opts.thin ? 1.2 : (1.4 + (i % 3) * 0.55);
+    ctx.beginPath();
+    ctx.moveTo(x0, yy);
+    ctx.lineTo(x1, yy);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawSkySprint() {
   if (!skySprintActive) return;
   const mul = skySprintMul(); // 0.3→1→0.3，用于淡入淡出
-  const alpha = Math.max(0.15, mul); // 视觉alpha跟随速度倍率
-  // 起飞速度线（密集，alpha淡入淡出）
-  ctx.strokeStyle = `rgba(255,217,61,${0.5 * alpha})`;
-  ctx.lineWidth = 2;
-  for (let i = 0; i < 16; i++) {
-    const yy = 20 + i * 28;
-    const ll = 40 + (i % 4) * 20;
-    const off = (animT * 800 + i * 60) % W;
+  const alpha = Math.max(0.15, mul);
+
+  // 顶/底轻微气流带 + 水平拖影（不再画斜黄线）
+  const band = ctx.createLinearGradient(0, 0, 0, H);
+  band.addColorStop(0, `rgba(255,230,170,${0.1 * alpha})`);
+  band.addColorStop(0.18, 'rgba(255,230,170,0)');
+  band.addColorStop(0.78, 'rgba(255,230,170,0)');
+  band.addColorStop(1, `rgba(255,210,140,${0.08 * alpha})`);
+  ctx.fillStyle = band;
+  ctx.fillRect(0, 0, W, H);
+
+  drawMotionStreaks(0.55 * alpha, {
+    count: 12,
+    speed: 980,
+    y0: 48,
+    y1: GROUND - 40,
+    minLen: 70,
+    lenStep: 22,
+  });
+
+  // 角色身后淡拖影（强调冲刺方向）
+  ctx.save();
+  for (let i = 1; i <= 4; i++) {
+    const a = (0.14 * alpha) / i;
+    const ox = CHAR_X - i * 18;
+    const oy = GROUND - SKY_SPRINT_H - 8;
+    const g = ctx.createRadialGradient(ox, oy, 2, ox, oy, 28 + i * 6);
+    g.addColorStop(0, `rgba(255,245,210,${a})`);
+    g.addColorStop(1, 'rgba(255,245,210,0)');
+    ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(W - off, yy);
-    ctx.lineTo(W - off + ll, yy - 6);
-    ctx.stroke();
+    ctx.ellipse(ox, oy, 22 + i * 4, 14 + i * 2, 0, 0, Math.PI * 2);
+    ctx.fill();
   }
-  const remain = Math.max(0, SKY_SPRINT_DUR - skySprintTime);
+  ctx.restore();
+
+  const remain = Math.max(0, skySprintDurActive - skySprintTime);
   ctx.fillStyle = `rgba(0,0,0,${0.72 * alpha})`;
   ctx.fillRect(W / 2 - 100, 14, 200, 40);
   ctx.save();
@@ -3480,7 +3827,7 @@ function drawSkySprint() {
   });
   ctx.restore();
   // 起飞进度条
-  const pct = skySprintTime / SKY_SPRINT_DUR;
+  const pct = skySprintTime / skySprintDurActive;
   ctx.fillStyle = `rgba(0,0,0,${0.5 * alpha})`;
   ctx.fillRect(W / 2 - 80, 52, 160, 6);
   ctx.fillStyle = `rgba(255,140,60,${alpha})`;
@@ -3536,55 +3883,62 @@ function drawPortal() {
   if (!portal) return;
   const px2 = portal.x;
   const py2 = portal.y;
-  const glowA = 0.25 + 0.15 * Math.sin(animT * 4);
-  ctx.fillStyle = `rgba(255,217,61,${glowA})`;
+  const suckBoost = portalSuck ? Math.min(1, portalSuck.t / PORTAL_SUCK_DUR) : 0;
+  const drawH = PORTAL_DRAW_H * (1 + 0.08 * suckBoost);
+  const pulse = 0.35 + 0.2 * Math.sin(animT * 5) + 0.25 * suckBoost;
+  // 仅旋涡光晕（无门框）
+  const glow = ctx.createRadialGradient(px2, py2, drawH * 0.12, px2, py2, drawH * 0.55);
+  glow.addColorStop(0, `rgba(230,180,255,${0.35 + 0.25 * suckBoost})`);
+  glow.addColorStop(0.45, `rgba(140,70,220,${0.18 + 0.1 * suckBoost})`);
+  glow.addColorStop(1, 'rgba(80,40,160,0)');
+  ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(px2, py2, 44, 0, Math.PI * 2);
+  ctx.ellipse(px2, py2, drawH * 0.38, drawH * 0.52, 0, 0, Math.PI * 2);
   ctx.fill();
-  if (drawWorldSprite(WORLD_ASSETS.portal, px2, py2, 78, 'center')) {
-    ctx.save();
-    ctx.translate(px2, py2);
-    ctx.rotate(animT * 2);
-    for (let i = 0; i < 4; i++) {
-      const a = i * (Math.PI / 2);
-      ctx.fillStyle = '#ffd93d';
-      ctx.beginPath();
-      ctx.arc(Math.cos(a) * 28, Math.sin(a) * 28, 2.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-    return;
-  }
+
   ctx.save();
   ctx.translate(px2, py2);
-  ctx.strokeStyle = '#ffd93d';
-  ctx.lineWidth = 4;
+  ctx.rotate(animT * (1.6 + suckBoost * 4));
+  const spun = drawWorldSprite(WORLD_ASSETS.portal, 0, 0, drawH, 'center');
+  ctx.restore();
+  if (spun) {
+    // 中心亮核
+    ctx.fillStyle = `rgba(255,230,255,${pulse * 0.55})`;
+    ctx.beginPath();
+    ctx.ellipse(px2, py2, 10 + suckBoost * 8, 14 + suckBoost * 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+  // 贴图未就绪时的程序化旋涡
+  ctx.save();
+  ctx.translate(px2, py2);
+  ctx.rotate(animT * 2.5);
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    ctx.strokeStyle = `rgba(${180 + i * 12},${90 + i * 20},255,${0.55 - i * 0.06})`;
+    ctx.lineWidth = 4 - i * 0.4;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, drawH * (0.18 + i * 0.05), drawH * (0.28 + i * 0.04), a, 0, Math.PI * 1.4);
+    ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(200,140,255,0.7)';
   ctx.beginPath();
-  ctx.arc(0, 0, 35, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = 'rgba(132,94,194,0.6)';
-  ctx.beginPath();
-  ctx.arc(0, 0, 12, 0, Math.PI * 2);
+  ctx.arc(0, 0, 14, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
 
 function drawBonusTint() {
   if (!bonusActive) return;
-  ctx.fillStyle = 'rgba(255,240,180,0.1)';
+  // 轻暖金罩，保持跑酷走廊可读性（不做糖果粒子）
+  const pulse = 0.07 + 0.02 * Math.sin(animT * 1.4);
+  ctx.fillStyle = `rgba(255,210,120,${pulse})`;
   ctx.fillRect(0, 0, W, H);
-  ctx.save();
-  ctx.globalAlpha = 0.22 + Math.sin(animT * 2) * 0.06;
-  for (let i = 0; i < 8; i++) {
-    const px = (i * 110 + animT * 40) % (W + 80) - 40;
-    const py = 70 + (i % 3) * 70;
-    if (py > GROUND - 120) continue;
-    ctx.fillStyle = ['#ffe066', '#c77dff', '#7ae582'][i % 3];
-    ctx.beginPath();
-    ctx.arc(px, py, 4 + (i % 2) * 2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
+  const wash = ctx.createRadialGradient(W * 0.5, GROUND * 0.35, 40, W * 0.5, GROUND * 0.5, 420);
+  wash.addColorStop(0, 'rgba(255,230,160,0.1)');
+  wash.addColorStop(1, 'rgba(255,180,80,0)');
+  ctx.fillStyle = wash;
+  ctx.fillRect(0, 0, W, GROUND);
 }
 
 function drawBonusHud() {
@@ -3734,19 +4088,18 @@ function draw() {
   drawWalls();
   drawBeams();
   drawSpikes();
-  // 高速速度线（速度倍率 ≥1.5）
-  if (speedMul() >= 1.5) {
-    const intensity = Math.min(0.4, (speedMul() - 1) * 0.2);
-    ctx.strokeStyle = `rgba(255,217,61,${intensity})`;
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 7; i++) {
-      const yy = 20 + i * 36;
-      const ll = 30 + (i % 3) * 18;
-      ctx.beginPath();
-      ctx.moveTo(W - ll, yy);
-      ctx.lineTo(W, yy - 8);
-      ctx.stroke();
-    }
+  // 高速水平拖影（起飞时改由 drawSkySprint，这里跳过避免叠两套）
+  if (!skySprintActive && speedMul() >= 1.5) {
+    const intensity = Math.min(0.55, (speedMul() - 1) * 0.28);
+    drawMotionStreaks(intensity, {
+      count: 7,
+      speed: 640,
+      y0: 50,
+      y1: GROUND - 50,
+      minLen: 36,
+      lenStep: 14,
+      thin: true,
+    });
   }
   drawMonsters();
   drawFlyers();
@@ -4079,19 +4432,23 @@ function loadSpriteManifest() {
         for (const frame of Object.values(CHAR_SPRITES[id])) applyManifestMeta(frame);
       }
       for (const frame of Object.values(WORLD_ASSETS)) applyManifestMeta(frame);
-      for (const id of ['mage', 'warrior']) {
-        for (const sheet of [CHAR_RUN_SHEETS[id], CHAR_ROLL_SHEETS[id]]) {
-          const file = String(sheet.src).split('/').pop();
-          const entry = SPRITE_MANIFEST?.sprites?.[file];
-          if (entry?.frames) {
-            sheet.frames = entry.frames;
-            if (entry.refH) sheet.refH = entry.refH;
-            sheet.cols = entry.cols || sheet.cols || 3;
-            sheet.rows = entry.rows || sheet.rows || 1;
-          }
-          applyManifestMeta(sheet);
+      const applySheetEntry = (sheet, fallbackCols = 3, fallbackRows = 1) => {
+        if (!sheet?.src) return;
+        const file = String(sheet.src).split('/').pop();
+        const entry = SPRITE_MANIFEST?.sprites?.[file] || SPRITE_MANIFEST?.sheets?.[file];
+        if (entry?.frames?.length) {
+          sheet.frames = entry.frames;
+          if (entry.refH) sheet.refH = entry.refH;
+          sheet.cols = entry.cols || sheet.cols || fallbackCols;
+          sheet.rows = entry.rows || sheet.rows || fallbackRows;
         }
+        applyManifestMeta(sheet);
+      };
+      for (const id of ['mage', 'warrior']) {
+        applySheetEntry(CHAR_RUN_SHEETS[id], 3, 3);
+        applySheetEntry(CHAR_ROLL_SHEETS[id], 3, 1);
       }
+      applySheetEntry(WORLD_ASSETS.monsterWalk, 4, 1);
     })
     .catch(() => {});
 }
@@ -4196,10 +4553,26 @@ function pickRunSheet(charId) {
   const frames = ensureSheetFrames(sheet);
   if (!frames?.length) return null;
   const n = frames.length;
-  const RUN_FPS = 38;
+  // 法师 / 战士跑帧
+  const RUN_FPS = 20;
   const idx = Math.floor(animT * RUN_FPS) % n;
   const frame = frames[idx];
   return { kind: 'runSheet', sheet, frame, charId, frameIndex: idx };
+}
+
+function pickAirSprite(frames) {
+  // ant → jump → fly：按离地时间 + 垂速分相，避免整段空中只用 jump
+  if (airAge < 0.1 || (vy > 90 && px < 48)) {
+    return firstReadySprite(frames.jumpAnt, frames.jump, frames.fly);
+  }
+  if (vy > 40) {
+    return firstReadySprite(frames.jump, frames.jumpAnt, frames.fly);
+  }
+  if (vy > -25 && px > 55) {
+    // 顶点附近仍用 jump，稍后切入 fly
+    return firstReadySprite(frames.jump, frames.fly, frames.jumpAnt);
+  }
+  return firstReadySprite(frames.fly, frames.jump, frames.jumpAnt);
 }
 
 function pickCharSprite(charId) {
@@ -4211,12 +4584,14 @@ function pickCharSprite(charId) {
   if (atkActive) {
     if (charId === 'warrior') {
       const windFrac = warriorSlashT / SWORD_SLASH_DUR;
-      if (windFrac > 0.55) return firstReadySprite(frames.atkWind, frames.atk);
-      return firstReadySprite(frames.atk, frames.atkWind);
+      if (windFrac > 0.62) return firstReadySprite(frames.atkWind, frames.atk);
+      if (windFrac > 0.22) return firstReadySprite(frames.atk, frames.atkWind);
+      return firstReadySprite(frames.atkWind, frames.atk);
     }
     const p = 1 - Math.max(0, Math.min(1, attackFx / MAGE_ATK_DUR));
-    if (p < 0.36) return firstReadySprite(frames.atkWind, frames.atk);
-    if (p < 0.78) return firstReadySprite(frames.atk, frames.atkWind);
+    if (p < 0.28) return firstReadySprite(frames.atkWind, frames.atk);
+    if (p < 0.72) return firstReadySprite(frames.atk, frames.atkWind);
+    // 收招回到蓄力姿态过渡，再回跑
     return firstReadySprite(frames.atkWind, frames.atk);
   }
 
@@ -4224,12 +4599,13 @@ function pickCharSprite(charId) {
     return firstReadySprite(frames.fly, frames.jump, frames.jumpAnt);
   }
 
-  if (px > 10) {
-    if (typeof vy === 'number' && vy > 40 && px < 55) {
-      return firstReadySprite(frames.jumpAnt, frames.jump);
-    }
-    return firstReadySprite(frames.jump, frames.jumpAnt);
+  // 落地缓冲：短时间用 squat/ant，衔接跑循环
+  if (landPoseT > 0 && px <= 8) {
+    return firstReadySprite(frames.jumpAnt, frames.jump);
   }
+
+  const airborne = px > 6 || vy > 30;
+  if (airborne) return pickAirSprite(frames);
 
   return pickRunSheet(charId);
 }
@@ -4268,8 +4644,8 @@ function drawCharSprite(cx, cy, bob, hMul, asset) {
   const m = ensureSpriteMeta(asset);
   if (!m) return false;
   const cid = m.char || (isWarrior() ? 'warrior' : 'mage');
-  const refH = SPRITE_REF_H[cid] || m.h || 500;
-  const scale = CHAR_H_STAND / refH;
+  // 与跑步同一锁比（refH）：勿按单帧 content.h 缩放，否则剑气/挥砍加高会把身体压小
+  const scale = charBodyScale(cid);
   const dw = m.w * scale;
   const dh = m.h * scale;
   const yBob = px > 10 ? bob : 0;

@@ -26,6 +26,8 @@ www/castle-parkour/assets/mage-run[0-9].png
 www/castle-parkour/assets/warrior-run[0-9].png
 www/castle-parkour/assets/*-jump-sheet.png
 www/castle-parkour/assets/*-atk-sheet.png
+www/castle-parkour/assets/*-fly-sheet.png
+# jump/atk/fly sheets 仅作管线中间态，真源在 dev/art-raw/
 
 # editor / agent junk
 .cursor/

@@ -6,7 +6,7 @@
  * 2. Drop PNGs into assets/ and refresh sprite-manifest.json
  * 3. Wire unlock/shop UI in game.js if needed
  */
-export const ASSET_VER = '20260813h';
+export const ASSET_VER = '20260813z';
 
 export const CHAR_NAMES = { mage: '法师', warrior: '战士' };
 
@@ -41,8 +41,8 @@ export const CHAR_RUN_SHEETS = {
 
 /** 1x3 roll strip */
 export const CHAR_ROLL_SHEETS = {
-  mage: { src: 'assets/mage-roll-sheet.png', img: null, ready: false, frames: null, refH: 280, cols: 3, rows: 1 },
-  warrior: { src: 'assets/warrior-roll-sheet.png', img: null, ready: false, frames: null, refH: 251, cols: 3, rows: 1 },
+  mage: { src: 'assets/mage-roll-sheet.png', img: null, ready: false, frames: null, refH: 285, cols: 3, rows: 1 },
+  warrior: { src: 'assets/warrior-roll-sheet.png', img: null, ready: false, frames: null, refH: 232, cols: 3, rows: 1 },
 };
 
 /** Optional runtime registration for mods / future hooks */

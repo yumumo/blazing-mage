@@ -11,3 +11,5 @@ export {
 } from './characters.js';
 
 export { WORLD_ASSETS, registerWorldAsset } from './world.js';
+
+export * from './gameplay.js';

@@ -19,6 +19,16 @@ export const WORLD_ASSETS = {
   firePillar: { src: 'assets/fire-pillar.png', img: null, ready: false },
   beam: { src: 'assets/beam.png', img: null, ready: false },
   platform: { src: 'assets/platform.png', img: null, ready: false },
+  bonusBg: { src: 'assets/bonus-bg.png', img: null, ready: false },
+  monsterWalk: {
+    src: 'assets/monster-idle-sheet.png',
+    img: null,
+    ready: false,
+    frames: null,
+    refH: 280,
+    cols: 4,
+    rows: 1,
+  },
 };
 
 export function registerWorldAsset(key, src) {

@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Noto+Sans+SC:wght@500;700;900&family=Noto+Serif+SC:wght@600;700&display=swap");
 /* ========== boot loading ========== */
 .boot-loading {
   position: fixed;
@@ -30,7 +31,7 @@
 .boot-loading-text {
   margin: 0;
   text-align: center;
-  font: 600 14px/1.4 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font: 700 15px/1.4 "Noto Sans SC", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   letter-spacing: 0.06em;
   color: rgba(250, 246, 236, 0.72);
 }
@@ -85,7 +86,7 @@ body {
     radial-gradient(ellipse 50% 30% at 20% 80%, rgba(255,140,60,0.08), transparent 50%),
     linear-gradient(180deg, #1a2040 0%, #2a2435 55%, #1a1520 100%);
   color: var(--moon);
-  font: 15px/1.65 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font: 500 15px/1.65 "Noto Sans SC", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
@@ -169,9 +170,14 @@ body {
 }
 .title {
   position: relative; z-index: 1;
-  font-size: 30px; font-weight: 900; letter-spacing: 3px;
-  color: var(--yellow);
-  text-shadow: 0 2px 0 #1a1520, 0 0 18px rgba(255,180,90,0.25);
+  font-family: "Noto Serif SC", "Cinzel", "PingFang SC", serif;
+  font-size: 34px; font-weight: 700; letter-spacing: 0.12em;
+  color: #ffe9a8;
+  -webkit-text-stroke: 0.4px #1a1520;
+  text-shadow:
+    0 1px 0 #1a1520,
+    0 2px 0 #2a1c10,
+    0 0 14px rgba(255,180,90,0.35);
 }
 .subtitle {
   text-align: center; font-size: 13px; font-weight: 700;
@@ -383,6 +389,9 @@ canvas { display: block; width: 100%; height: auto; touch-action: none; }
 
 /* ========== Stats Screen ========== */
 .panel { padding: 0 12px; max-width: 480px; margin: 0 auto; }
+.panel h2, .menu-char-name, .char-tab, .chip, button {
+  font-family: "Noto Sans SC", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
 .panel h2 { text-align: center; font-size: 18px; font-weight: 900; margin: 6px 0 16px; letter-spacing: 1px; color: var(--yellow); text-shadow: 0 1px 2px rgba(0,0,0,0.55); }
 .stat-row {
   display: flex; justify-content: space-between; align-items: center;
@@ -402,18 +411,23 @@ canvas { display: block; width: 100%; height: auto; touch-action: none; }
   font-size: 20px; box-shadow: 0 4px 0 #1a1520; color: #1a1520;
 }
 .upgrade {
-  display: flex; align-items: center; gap: 12px;
-  padding: 13px 8px; border: 2px solid #5a4f42; border-radius: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px 118px;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 10px; border: 2px solid #5a4f42; border-radius: 10px;
   margin-bottom: 14px; background: #2a2435; box-shadow: inset 0 0 20px rgba(0,0,0,0.25);
   color: var(--moon);
+  min-height: 64px;
 }
-.upgrade .meta { flex: 1; min-width: 0; }
-.upgrade .name { font-size: 15px; font-weight: 900; color: var(--yellow); }
-.upgrade .desc { font-size: 12px; font-weight: 600; color: var(--muted); opacity: 1; }
-.upgrade .lv { letter-spacing: 4px; color: var(--torch); font-size: 13px; font-weight: 900; }
+.upgrade .meta { min-width: 0; }
+.upgrade .name { font-size: 15px; font-weight: 900; color: var(--yellow); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.upgrade .desc { font-size: 12px; font-weight: 600; color: var(--muted); opacity: 1; line-height: 1.35; min-height: 2.6em; }
+.upgrade .lv { letter-spacing: 4px; color: var(--torch); font-size: 13px; font-weight: 900; text-align: center; }
 .upgrade .lv .off { color: #a89880; }
 .upgrade button {
-  padding: 8px 14px; border: 2px solid #c4a468; border-radius: 8px;
+  width: 100%; justify-self: stretch;
+  padding: 8px 10px; border: 2px solid #c4a468; border-radius: 8px;
   background: linear-gradient(180deg, #4a6a58, #2a4034); color: var(--moon); font: inherit; font-size: 13px;
   font-weight: 800; cursor: pointer; box-shadow: 0 3px 0 #1a1520; white-space: nowrap;
 }
@@ -862,4 +876,24 @@ html.mobile-ui body {
   .game-landscape.force-landscape-rotate .controls {
     position: fixed;
   }
+}
+
+
+/* castle mobile polish */
+@media (max-width: 820px) {
+  .title { font-family: "Noto Serif SC", "Cinzel", serif; letter-spacing: 0.1em; font-size: 30px; }
+  .controls { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .ctrl-btn {
+    min-width: 64px; min-height: 64px;
+    touch-action: manipulation;
+  }
+  .hud { gap: 6px; flex-wrap: wrap; }
+  .chip { font-size: 12px; }
+  .tips { display: none; }
+  #screen-char .char-layout { gap: 12px; }
+  .upgrade { grid-template-columns: minmax(0, 1fr) 72px 100px; gap: 8px; }
+}
+@media (orientation: landscape) and (max-height: 480px) {
+  .menu-top .subtitle { display: none; }
+  .boot-loading-text { font-size: 13px; }
 }
