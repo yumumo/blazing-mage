@@ -1,15 +1,17 @@
-# 烈焰法师 · 开发文档
+# 古堡跑酷 · 开发文档
 
-`www/demo/index.html` 是单文件网页游戏，HTML/CSS/JS 全内联。游戏不依赖外部图片，角色、怪物、金币、道具、背景和 UI 均由 Canvas 或 CSS 过程化绘制；未引用的 `assets/` 贴图目录已删除。
+`www/castle-parkour/index.html` 是单文件网页游戏，HTML/CSS/JS 全内联。默认角色、怪物、金币、道具、背景和 UI 由 Canvas 或 CSS 过程化绘制；可选 PNG 放在 `www/castle-parkour/assets/`。
+
+**AI 贴图**：主仓 skill `castle-parkour-art` + 规则 `.cursor/rules/castle-parkour-art.mdc`（品红底 → chroma key；勿在本 Core 内写规则副本）。
 
 ## 发布结构
 
-本仓对应 XRK-AGT Core 静态应用：`www/demo/`（挂载路径 `/demo`）。
+本仓对应 XRK-AGT Core 静态应用：`www/castle-parkour/`（挂载路径 `/castle-parkour`）。
 
 Cloudflare Pages（见根目录 `wrangler.toml`）：
 
 ```text
-pages_build_output_dir = "www/demo"
+pages_build_output_dir = "www/castle-parkour"
 ```
 
 无构建命令；产物内为 `index.html`（及 `_headers`）。独立发布与 AGT 内挂载共用同一入口文件。
@@ -77,7 +79,7 @@ pages_build_output_dir = "www/demo"
 
 发布前至少检查：
 
-- `www/demo/index.html` 存在。
-- 搜索不到 `assets/`、`.png`、`new Image` 等图片依赖。
+- `www/castle-parkour/index.html` 存在。
+- 若已接入 `assets/*.png`，确认路径可访问且无 404；未接入时仍可无图片依赖运行。
 - 桌面端可进入游戏，触控按钮可触发跳跃和攻击。
 - 手机窄屏没有横向滚动，横屏下画布和按钮都可见。

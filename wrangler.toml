@@ -1,4 +1,4 @@
-# Cloudflare Pages — 烈焰法师（静态站，无构建）
-name = "blazing-mage"
+# Cloudflare Pages — 古堡跑酷（静态站，无构建）
+name = "castle-parkour"
 compatibility_date = "2025-08-12"
-pages_build_output_dir = "www/demo"
+pages_build_output_dir = "www/castle-parkour"

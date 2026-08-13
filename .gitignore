@@ -9,3 +9,5 @@ _smoke_*
 progress.md
 .wrangler/
 dist/
+dev/art-raw/
+dev/.cursor-core/
