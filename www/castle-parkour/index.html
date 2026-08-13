@@ -1301,7 +1301,7 @@
     const TUTORIAL_END = 420;
     const TUTORIAL_STEPS = [
       { m: 12,  type: 'info',    title: '基本操作', text: 'W/↑ 跳跃（空中可再跳）· S/↓ 翻滚 · J 攻击', wait: 2.8 },
-      { m: 55,  type: 'wall',    title: '跳跃躲避', text: '靠近矮墙时按 W 跳过去！', action: 'jump', freezeAt: 100 },
+      { m: 55,  type: 'wall',    title: '跳跃躲避', text: '靠近火桩时按 W 跳过去！', action: 'jump', freezeAt: 100 },
       { m: 110, type: 'beam',    title: '翻滚穿越', text: '靠近横梁时按 S 翻滚穿过！', action: 'duck', freezeAt: 95 },
       { m: 165, type: 'gap',     title: '跨越坑洞', text: '靠近坑边按 W 跳过去！', action: 'jump', freezeAt: 105 },
       { m: 220, type: 'monster', title: '火球攻击', text: '按 J 发射火球击败怪物！', action: 'attack', freezeAt: 160 },
@@ -2682,7 +2682,7 @@
           if (screenX < CHAR_X - 50) { tutorialSpawned.add(i); continue; } // 已错过，标记跳过
           if (screenX > W + 300) continue; // 还没到时间，等下一帧再检查
           tutorialSpawned.add(i);
-          if (ts.type === 'wall') walls.push({ x: screenX, w: 28, h: 44 }); // 矮墙，一跳可过
+          if (ts.type === 'wall') walls.push({ x: screenX, w: 28, h: 44 }); // 火桩，一跳可过
           else if (ts.type === 'beam') beams.push({ x: screenX, w: 88 });
           else if (ts.type === 'monster') {
             // 教程小怪刷两只，防止提前打死导致教程卡住
@@ -3036,31 +3036,6 @@
       });
     }
 
-    function drawShape(x, y, size, type, color, rot) {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(rot);
-      ctx.fillStyle = color;
-      ctx.strokeStyle = 'rgba(26,26,26,0.25)';
-      ctx.lineWidth = 2;
-      if (type === 'circle') {
-        ctx.beginPath(); ctx.arc(0, 0, size, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      } else if (type === 'triangle') {
-        ctx.beginPath();
-        ctx.moveTo(0, -size); ctx.lineTo(size * 0.87, size * 0.5); ctx.lineTo(-size * 0.87, size * 0.5);
-        ctx.closePath(); ctx.fill(); ctx.stroke();
-      } else if (type === 'square') {
-        ctx.fillRect(-size, -size, size * 2, size * 2);
-        ctx.strokeRect(-size, -size, size * 2, size * 2);
-      } else if (type === 'cross') {
-        const w = size * 0.4;
-        ctx.fillRect(-w, -size, w * 2, size * 2);
-        ctx.fillRect(-size, -w, size * 2, w * 2);
-        ctx.strokeRect(-w, -size, w * 2, size * 2);
-        ctx.strokeRect(-size, -w, size * 2, w * 2);
-      }
-      ctx.restore();
-    }
 
     // 缓存背景渐变（每 3 帧更新一次，大幅减少 createGradient 调用）
     let _bgCacheFrame = 0;
@@ -3551,7 +3526,7 @@
         ctx.fillRect(bx + 174, baseY - 78, 8, 8);
         ctx.fillRect(bx + 190, baseY - 78, 8, 8);
         ctx.fillRect(bx + 206, baseY - 78, 8, 8);
-        // 塔间矮墙填缝
+        // 塔间火桩填缝
         ctx.fillRect(bx + 66, baseY - 36, 34, 36);
         ctx.fillRect(bx + 152, baseY - 28, 26, 28);
         ctx.fillRect(bx + 212, baseY - 24, period - 212, 24);
@@ -3785,21 +3760,52 @@
       }
     }
 
+    function drawFirePillar(x, y, w, h) {
+      // 贴图缺失时的火桩：石座 + 铁桩 + 火焰
+      const baseH = Math.max(10, h * 0.22);
+      const stakeW = Math.max(4, w * 0.18);
+      const cx = x + w / 2;
+      ctx.fillStyle = '#3a3344';
+      ctx.fillRect(x + w * 0.12, y + h - baseH, w * 0.76, baseH);
+      ctx.fillStyle = '#2a2430';
+      ctx.fillRect(x + w * 0.08, y + h - 5, w * 0.84, 5);
+      ctx.fillStyle = '#c4a468';
+      ctx.fillRect(x + w * 0.14, y + h - baseH, w * 0.72, 2);
+      ctx.fillStyle = '#1a1520';
+      ctx.fillRect(cx - stakeW / 2, y + h * 0.28, stakeW, h - baseH - h * 0.28);
+      const flicker = 0.85 + 0.15 * Math.sin(animT * 14 + x * 0.05);
+      const fh = (h - baseH) * 0.72 * flicker;
+      const fw = w * 0.78 * flicker;
+      const fy = y + h - baseH - fh;
+      ctx.fillStyle = '#ff4a1a';
+      ctx.beginPath();
+      ctx.moveTo(cx, fy);
+      ctx.quadraticCurveTo(cx + fw * 0.55, fy + fh * 0.35, cx + fw * 0.28, fy + fh);
+      ctx.lineTo(cx - fw * 0.28, fy + fh);
+      ctx.quadraticCurveTo(cx - fw * 0.55, fy + fh * 0.35, cx, fy);
+      ctx.fill();
+      ctx.fillStyle = '#ffb020';
+      ctx.beginPath();
+      ctx.moveTo(cx, fy + fh * 0.18);
+      ctx.quadraticCurveTo(cx + fw * 0.28, fy + fh * 0.45, cx + fw * 0.12, fy + fh * 0.85);
+      ctx.lineTo(cx - fw * 0.12, fy + fh * 0.85);
+      ctx.quadraticCurveTo(cx - fw * 0.28, fy + fh * 0.45, cx, fy + fh * 0.18);
+      ctx.fill();
+      ctx.fillStyle = '#ffe8a0';
+      ctx.beginPath();
+      ctx.moveTo(cx, fy + fh * 0.35);
+      ctx.quadraticCurveTo(cx + fw * 0.12, fy + fh * 0.55, cx, fy + fh * 0.78);
+      ctx.quadraticCurveTo(cx - fw * 0.12, fy + fh * 0.55, cx, fy + fh * 0.35);
+      ctx.fill();
+    }
+
     function drawWalls() {
       for (const wE of walls) {
         const wh = wallH(wE);
-        if (drawWorldSpriteBox(WORLD_ASSETS.wall, wE.x - 4, GROUND - wh - 6, wE.w + 8, wh + 10)) continue;
-        drawStoneBlock(wE.x, GROUND - wh, wE.w, wh, '#4a424a');
-        ctx.fillStyle = 'rgba(196,164,104,0.35)';
-        ctx.fillRect(wE.x, GROUND - wh, wE.w, 5);
-        const archCx = wE.x + wE.w / 2;
-        ctx.fillStyle = '#2a2228';
-        ctx.beginPath();
-        ctx.arc(archCx, GROUND - wh, wE.w * 0.42, Math.PI, 0);
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(196,164,104,0.4)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        const cx = wE.x + wE.w / 2;
+        // 火桩贴图：脚底锚定，按高度缩放，避免硬拉变形
+        if (drawWorldSprite(WORLD_ASSETS.firePillar, cx, GROUND, wh + 14, 'feet')) continue;
+        drawFirePillar(wE.x, GROUND - wh, wE.w, wh);
       }
     }
 
@@ -5633,7 +5639,7 @@
       puAttack: { src: 'assets/pu-attack.png', img: null, ready: false },
       puFly: { src: 'assets/pu-fly.png', img: null, ready: false },
       torch: { src: 'assets/torch.png', img: null, ready: false },
-      wall: { src: 'assets/wall.png', img: null, ready: false },
+      firePillar: { src: 'assets/fire-pillar.png', img: null, ready: false },
       beam: { src: 'assets/beam.png', img: null, ready: false },
       platform: { src: 'assets/platform.png', img: null, ready: false },
     };
@@ -5853,30 +5859,31 @@
       return pickRunSheet(charId);
     }
 
-    function drawRunSheetSprite(cx, cy, bob, hMul, pick) {
+        function drawRunSheetSprite(cx, cy, bob, hMul, pick) {
       const { sheet, frame, charId } = pick;
       const img = sheet.img;
       if (!img || !frame) return false;
+      // 用每格 content 盒，避免整格透明边参与缩放；脚底贴 GROUND
+      const srcL = frame.left;
+      const srcT = frame.top;
+      const srcW = frame.w;
+      const srcH = frame.h;
+      if (!srcW || !srcH) return false;
       const scale = charBodyScale(charId);
-      const dw = frame.w * scale;
-      const dh = frame.h * scale;
+      const dw = srcW * scale;
+      const dh = srcH * scale;
       const yBob = px > 10 ? bob : 0;
       ctx.save();
       playerInvincibleFlicker(0.45);
       ctx.translate(cx, cy + yBob);
       ctx.scale(1, hMul);
-      // 脚底贴地：翻滚/跳跃/跑步同一锚定，避免动作切换时「跳变」
       const dy = -dh;
-      ctx.drawImage(img, frame.left, frame.top, frame.w, frame.h, -dw / 2, dy, dw, dh);
+      ctx.drawImage(img, srcL, srcT, srcW, srcH, -dw / 2, dy, dw, dh);
       ctx.restore();
       ctx.globalAlpha = 1;
       return true;
     }
 
-    /**
-     * 统一比例：散帧用 SPRITE_REF_H；跑步/翻滚表用跑步 refH。
-     * 脚底锚定，避免动作切换时上下跳变。
-     */
     function drawCharSprite(cx, cy, bob, hMul, asset) {
       if (asset?.kind === 'runSheet') {
         return drawRunSheetSprite(cx, cy, bob, hMul, asset);
@@ -5904,15 +5911,23 @@
 
     function drawPortraitImage(pctx, asset, w, h) {
       const img = asset.img;
-      const margin = w * 0.05;
-      const maxW = w - margin * 2;
-      const maxH = h * 0.9;
-      const scale = Math.min(maxW / img.width, maxH / img.height);
-      const dw = img.width * scale;
-      const dh = img.height * scale;
+      if (!img?.width) return;
+      // 用清单 content 盒，整只角色（含帽尖）缩进画布，禁止底对齐裁头顶
+      const m = ensureSpriteMeta(asset) || {
+        left: 0, top: 0, w: img.width, h: img.height,
+      };
+      const padX = w * 0.06;
+      const padTop = h * 0.05;
+      const padBot = h * 0.04;
+      const maxW = Math.max(8, w - padX * 2);
+      const maxH = Math.max(8, h - padTop - padBot);
+      const scale = Math.min(maxW / m.w, maxH / m.h);
+      const dw = m.w * scale;
+      const dh = m.h * scale;
       const dx = (w - dw) / 2;
-      const dy = h - dh - h * 0.03;
-      pctx.drawImage(img, dx, dy, dw, dh);
+      let dy = h - padBot - dh;
+      if (dy < padTop) dy = padTop;
+      pctx.drawImage(img, m.left, m.top, m.w, m.h, dx, dy, dw, dh);
     }
 
     function drawPortraitBg(pctx, w, h, charId) {

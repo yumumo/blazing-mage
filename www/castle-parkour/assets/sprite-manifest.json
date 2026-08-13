@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-13T09:57:49Z",
+  "generatedAt": "2026-08-13T11:10:41Z",
   "dir": "assets",
   "game": {
     "U": 40,
@@ -9,10 +9,7 @@
     "CHAR_H_DUCK": 40,
     "note": "draw scale = CHAR_H_STAND / refH[char]; head-lock at -CHAR_H_STAND"
   },
-  "refH": {
-    "mage": 502,
-    "warrior": 504
-  },
+  "refH": {},
   "sprites": {
     "bat.png": {
       "file": "bat.png",
@@ -20,23 +17,23 @@
       "role": "bat",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 117123,
+      "bytes": 115404,
       "content": {
         "left": 31,
         "top": 132,
         "right": 480,
-        "bottom": 378,
+        "bottom": 377,
         "w": 450,
-        "h": 247
+        "h": 246
       },
       "anchor": {
-        "footX": 0.4987,
-        "footY": 0.7397,
+        "footX": 0.4981,
+        "footY": 0.7378,
         "headY": 0.2583,
-        "footXInContent": 224.3
+        "footXInContent": 224.0
       },
       "plant": false,
-      "footGap": 133
+      "footGap": 134
     },
     "beam.png": {
       "file": "beam.png",
@@ -44,7 +41,7 @@
       "role": "beam",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 93477,
+      "bytes": 92252,
       "content": {
         "left": 31,
         "top": 153,
@@ -54,7 +51,7 @@
         "h": 205
       },
       "anchor": {
-        "footX": 0.4994,
+        "footX": 0.4995,
         "footY": 0.6986,
         "headY": 0.2994,
         "footXInContent": 224.7
@@ -68,7 +65,7 @@
       "role": "coin",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 217742,
+      "bytes": 216408,
       "content": {
         "left": 35,
         "top": 31,
@@ -86,13 +83,37 @@
       "plant": false,
       "footGap": 31
     },
+    "fire-pillar.png": {
+      "file": "fire-pillar.png",
+      "char": null,
+      "role": "fire-pillar",
+      "canvasW": 512,
+      "canvasH": 512,
+      "bytes": 89203,
+      "content": {
+        "left": 197,
+        "top": 62,
+        "right": 314,
+        "bottom": 511,
+        "w": 118,
+        "h": 450
+      },
+      "anchor": {
+        "footX": 0.5048,
+        "footY": 1.0,
+        "headY": 0.1213,
+        "footXInContent": 61.5
+      },
+      "plant": false,
+      "footGap": 0
+    },
     "fireball.png": {
       "file": "fireball.png",
       "char": null,
       "role": "fireball",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 215692,
+      "bytes": 213396,
       "content": {
         "left": 31,
         "top": 39,
@@ -116,7 +137,7 @@
       "role": "flyer",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 112776,
+      "bytes": 111584,
       "content": {
         "left": 31,
         "top": 131,
@@ -140,23 +161,23 @@
       "role": "atk-wind",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 334438,
+      "bytes": 247755,
       "content": {
-        "left": 0,
-        "top": 0,
-        "right": 511,
-        "bottom": 511,
-        "w": 512,
-        "h": 512
+        "left": 46,
+        "top": 88,
+        "right": 465,
+        "bottom": 507,
+        "w": 420,
+        "h": 420
       },
       "anchor": {
-        "footX": 0.3686,
-        "footY": 1.0,
-        "headY": 0.0,
-        "footXInContent": 188.7
+        "footX": 0.3881,
+        "footY": 0.9922,
+        "headY": 0.1722,
+        "footXInContent": 152.7
       },
       "plant": false,
-      "footGap": 0
+      "footGap": 4
     },
     "mage-atk.png": {
       "file": "mage-atk.png",
@@ -164,23 +185,23 @@
       "role": "atk",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 292786,
+      "bytes": 225150,
       "content": {
-        "left": 0,
-        "top": 0,
-        "right": 511,
-        "bottom": 497,
-        "w": 512,
-        "h": 498
+        "left": 40,
+        "top": 88,
+        "right": 471,
+        "bottom": 506,
+        "w": 432,
+        "h": 419
       },
       "anchor": {
-        "footX": 0.6798,
-        "footY": 0.9726,
-        "headY": 0.0,
-        "footXInContent": 348.1
+        "footX": 0.6515,
+        "footY": 0.9902,
+        "headY": 0.1722,
+        "footXInContent": 293.6
       },
       "plant": false,
-      "footGap": 14
+      "footGap": 5
     },
     "mage-fly.png": {
       "file": "mage-fly.png",
@@ -188,23 +209,23 @@
       "role": "fly",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 340301,
+      "bytes": 249506,
       "content": {
-        "left": 0,
-        "top": 0,
-        "right": 511,
-        "bottom": 510,
-        "w": 512,
-        "h": 511
+        "left": 45,
+        "top": 88,
+        "right": 465,
+        "bottom": 506,
+        "w": 421,
+        "h": 419
       },
       "anchor": {
-        "footX": 0.4118,
-        "footY": 0.998,
-        "headY": 0.0,
-        "footXInContent": 210.8
+        "footX": 0.4309,
+        "footY": 0.9902,
+        "headY": 0.1722,
+        "footXInContent": 175.6
       },
       "plant": false,
-      "footGap": 1
+      "footGap": 5
     },
     "mage-jump-ant.png": {
       "file": "mage-jump-ant.png",
@@ -212,23 +233,23 @@
       "role": "jump-ant",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 384958,
+      "bytes": 284569,
       "content": {
-        "left": 0,
-        "top": 0,
-        "right": 511,
-        "bottom": 511,
-        "w": 512,
-        "h": 512
+        "left": 46,
+        "top": 88,
+        "right": 465,
+        "bottom": 507,
+        "w": 420,
+        "h": 420
       },
       "anchor": {
-        "footX": 0.6005,
-        "footY": 1.0,
-        "headY": 0.0,
-        "footXInContent": 307.4
+        "footX": 0.5814,
+        "footY": 0.9922,
+        "headY": 0.1722,
+        "footXInContent": 251.7
       },
       "plant": false,
-      "footGap": 0
+      "footGap": 4
     },
     "mage-jump.png": {
       "file": "mage-jump.png",
@@ -236,28 +257,28 @@
       "role": "jump",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 294574,
+      "bytes": 214283,
       "content": {
-        "left": 0,
-        "top": 0,
-        "right": 509,
-        "bottom": 511,
-        "w": 510,
-        "h": 512
+        "left": 47,
+        "top": 88,
+        "right": 463,
+        "bottom": 507,
+        "w": 417,
+        "h": 420
       },
       "anchor": {
-        "footX": 0.5305,
-        "footY": 1.0,
-        "headY": 0.0,
-        "footXInContent": 271.6
+        "footX": 0.5264,
+        "footY": 0.9922,
+        "headY": 0.1722,
+        "footXInContent": 222.5
       },
       "plant": false,
-      "footGap": 0
+      "footGap": 4
     },
     "mage-roll-sheet.png": {
       "file": "mage-roll-sheet.png",
       "char": "mage",
-      "role": "run-sheet",
+      "role": "roll-sheet",
       "canvasW": 1024,
       "canvasH": 341,
       "bytes": 364002,
@@ -566,20 +587,20 @@
       "role": "monster-big",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 266034,
+      "bytes": 263530,
       "content": {
         "left": 16,
-        "top": 62,
+        "top": 63,
         "right": 495,
         "bottom": 511,
         "w": 480,
-        "h": 450
+        "h": 449
       },
       "anchor": {
-        "footX": 0.4989,
+        "footX": 0.4992,
         "footY": 1.0,
-        "headY": 0.1213,
-        "footXInContent": 239.5
+        "headY": 0.1233,
+        "footXInContent": 239.6
       },
       "plant": false,
       "footGap": 0
@@ -590,23 +611,23 @@
       "role": "monster",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 252683,
+      "bytes": 259874,
       "content": {
         "left": 0,
         "top": 62,
         "right": 511,
-        "bottom": 510,
+        "bottom": 511,
         "w": 512,
-        "h": 449
+        "h": 450
       },
       "anchor": {
-        "footX": 0.498,
-        "footY": 0.998,
+        "footX": 0.4969,
+        "footY": 1.0,
         "headY": 0.1213,
-        "footXInContent": 255.0
+        "footXInContent": 254.4
       },
       "plant": false,
-      "footGap": 1
+      "footGap": 0
     },
     "platform.png": {
       "file": "platform.png",
@@ -614,7 +635,7 @@
       "role": "platform",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 76428,
+      "bytes": 74986,
       "content": {
         "left": 31,
         "top": 186,
@@ -624,10 +645,10 @@
         "h": 139
       },
       "anchor": {
-        "footX": 0.499,
+        "footX": 0.4994,
         "footY": 0.6341,
         "headY": 0.364,
-        "footXInContent": 224.5
+        "footXInContent": 224.7
       },
       "plant": false,
       "footGap": 187
@@ -638,23 +659,23 @@
       "role": "portal",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 333391,
+      "bytes": 326036,
       "content": {
         "left": 58,
         "top": 31,
-        "right": 452,
-        "bottom": 480,
-        "w": 395,
-        "h": 450
+        "right": 451,
+        "bottom": 479,
+        "w": 394,
+        "h": 449
       },
       "anchor": {
-        "footX": 0.4972,
-        "footY": 0.9393,
+        "footX": 0.4975,
+        "footY": 0.9374,
         "headY": 0.0607,
-        "footXInContent": 196.6
+        "footXInContent": 196.7
       },
       "plant": false,
-      "footGap": 31
+      "footGap": 32
     },
     "pu-attack.png": {
       "file": "pu-attack.png",
@@ -662,7 +683,7 @@
       "role": "pu-attack",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 228278,
+      "bytes": 226990,
       "content": {
         "left": 38,
         "top": 31,
@@ -672,7 +693,7 @@
         "h": 450
       },
       "anchor": {
-        "footX": 0.4979,
+        "footX": 0.4978,
         "footY": 0.9393,
         "headY": 0.0607,
         "footXInContent": 216.9
@@ -686,7 +707,7 @@
       "role": "pu-double",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 233745,
+      "bytes": 232407,
       "content": {
         "left": 41,
         "top": 31,
@@ -696,10 +717,10 @@
         "h": 450
       },
       "anchor": {
-        "footX": 0.4991,
+        "footX": 0.4992,
         "footY": 0.9393,
         "headY": 0.0607,
-        "footXInContent": 214.5
+        "footXInContent": 214.6
       },
       "plant": false,
       "footGap": 31
@@ -710,7 +731,7 @@
       "role": "pu-fly",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 219438,
+      "bytes": 218139,
       "content": {
         "left": 37,
         "top": 31,
@@ -720,7 +741,7 @@
         "h": 450
       },
       "anchor": {
-        "footX": 0.5001,
+        "footX": 0.5,
         "footY": 0.9393,
         "headY": 0.0607,
         "footXInContent": 219.0
@@ -734,7 +755,7 @@
       "role": "pu-magnet",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 202974,
+      "bytes": 201631,
       "content": {
         "left": 37,
         "top": 31,
@@ -747,7 +768,7 @@
         "footX": 0.4995,
         "footY": 0.9393,
         "headY": 0.0607,
-        "footXInContent": 218.8
+        "footXInContent": 218.7
       },
       "plant": false,
       "footGap": 31
@@ -758,19 +779,19 @@
       "role": "spike",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 113732,
+      "bytes": 112678,
       "content": {
         "left": 102,
-        "top": 62,
+        "top": 63,
         "right": 408,
         "bottom": 511,
         "w": 307,
-        "h": 450
+        "h": 449
       },
       "anchor": {
-        "footX": 0.4982,
+        "footX": 0.4983,
         "footY": 1.0,
-        "headY": 0.1213,
+        "headY": 0.1233,
         "footXInContent": 153.1
       },
       "plant": false,
@@ -782,7 +803,7 @@
       "role": "torch",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 145536,
+      "bytes": 143382,
       "content": {
         "left": 108,
         "top": 31,
@@ -792,7 +813,7 @@
         "h": 450
       },
       "anchor": {
-        "footX": 0.3229,
+        "footX": 0.3228,
         "footY": 0.9393,
         "headY": 0.0607,
         "footXInContent": 57.3
@@ -800,53 +821,29 @@
       "plant": false,
       "footGap": 31
     },
-    "wall.png": {
-      "file": "wall.png",
-      "char": null,
-      "role": "wall",
-      "canvasW": 512,
-      "canvasH": 512,
-      "bytes": 263467,
-      "content": {
-        "left": 69,
-        "top": 62,
-        "right": 441,
-        "bottom": 511,
-        "w": 373,
-        "h": 450
-      },
-      "anchor": {
-        "footX": 0.6247,
-        "footY": 1.0,
-        "headY": 0.1213,
-        "footXInContent": 250.8
-      },
-      "plant": false,
-      "footGap": 0
-    },
     "warrior-atk-wind.png": {
       "file": "warrior-atk-wind.png",
       "char": "warrior",
       "role": "atk-wind",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 316154,
+      "bytes": 236190,
       "content": {
-        "left": 0,
-        "top": 0,
-        "right": 511,
-        "bottom": 511,
-        "w": 512,
-        "h": 512
+        "left": 46,
+        "top": 88,
+        "right": 465,
+        "bottom": 507,
+        "w": 420,
+        "h": 420
       },
       "anchor": {
-        "footX": 0.1661,
-        "footY": 1.0,
-        "headY": 0.0,
-        "footXInContent": 85.1
+        "footX": 0.2259,
+        "footY": 0.9922,
+        "headY": 0.1722,
+        "footXInContent": 69.7
       },
       "plant": false,
-      "footGap": 0
+      "footGap": 4
     },
     "warrior-atk.png": {
       "file": "warrior-atk.png",
@@ -854,23 +851,23 @@
       "role": "atk",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 315004,
+      "bytes": 234756,
       "content": {
-        "left": 0,
-        "top": 0,
-        "right": 511,
-        "bottom": 506,
-        "w": 512,
-        "h": 507
+        "left": 44,
+        "top": 88,
+        "right": 467,
+        "bottom": 507,
+        "w": 424,
+        "h": 420
       },
       "anchor": {
-        "footX": 0.7641,
-        "footY": 0.9902,
-        "headY": 0.0,
-        "footXInContent": 391.2
+        "footX": 0.719,
+        "footY": 0.9922,
+        "headY": 0.1722,
+        "footXInContent": 324.1
       },
       "plant": false,
-      "footGap": 5
+      "footGap": 4
     },
     "warrior-fly.png": {
       "file": "warrior-fly.png",
@@ -878,23 +875,23 @@
       "role": "fly",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 349691,
+      "bytes": 256291,
       "content": {
-        "left": 0,
-        "top": 0,
-        "right": 511,
-        "bottom": 511,
-        "w": 512,
-        "h": 512
+        "left": 46,
+        "top": 88,
+        "right": 465,
+        "bottom": 507,
+        "w": 420,
+        "h": 420
       },
       "anchor": {
-        "footX": 0.0358,
-        "footY": 1.0,
-        "headY": 0.0,
-        "footXInContent": 18.3
+        "footX": 0.1186,
+        "footY": 0.9922,
+        "headY": 0.1722,
+        "footXInContent": 14.7
       },
       "plant": false,
-      "footGap": 0
+      "footGap": 4
     },
     "warrior-jump-ant.png": {
       "file": "warrior-jump-ant.png",
@@ -902,23 +899,23 @@
       "role": "jump-ant",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 348618,
+      "bytes": 258889,
       "content": {
-        "left": 0,
-        "top": 0,
-        "right": 511,
-        "bottom": 511,
-        "w": 512,
-        "h": 512
+        "left": 46,
+        "top": 88,
+        "right": 465,
+        "bottom": 507,
+        "w": 420,
+        "h": 420
       },
       "anchor": {
-        "footX": 0.6015,
-        "footY": 1.0,
-        "headY": 0.0,
-        "footXInContent": 308.0
+        "footX": 0.5842,
+        "footY": 0.9922,
+        "headY": 0.1722,
+        "footXInContent": 253.1
       },
       "plant": false,
-      "footGap": 0
+      "footGap": 4
     },
     "warrior-jump.png": {
       "file": "warrior-jump.png",
@@ -926,28 +923,28 @@
       "role": "jump",
       "canvasW": 512,
       "canvasH": 512,
-      "bytes": 293895,
+      "bytes": 214666,
       "content": {
-        "left": 0,
-        "top": 0,
-        "right": 511,
-        "bottom": 511,
-        "w": 512,
-        "h": 512
+        "left": 46,
+        "top": 88,
+        "right": 465,
+        "bottom": 507,
+        "w": 420,
+        "h": 420
       },
       "anchor": {
-        "footX": 0.3314,
-        "footY": 1.0,
-        "headY": 0.0,
-        "footXInContent": 169.7
+        "footX": 0.3615,
+        "footY": 0.9922,
+        "headY": 0.1722,
+        "footXInContent": 139.1
       },
       "plant": false,
-      "footGap": 0
+      "footGap": 4
     },
     "warrior-roll-sheet.png": {
       "file": "warrior-roll-sheet.png",
       "char": "warrior",
-      "role": "run-sheet",
+      "role": "roll-sheet",
       "canvasW": 1024,
       "canvasH": 341,
       "bytes": 367854,
@@ -1300,38 +1297,38 @@
     }
   },
   "sheetRefH": {
-    "mage": 291,
-    "warrior": 295
+    "mage": 280,
+    "warrior": 251
   },
   "sheets": {
-    "mage-run-sheet.png": {
-      "file": "mage-run-sheet.png",
+    "mage-roll-sheet.png": {
+      "file": "mage-roll-sheet.png",
       "canvasW": 1024,
-      "canvasH": 1024,
+      "canvasH": 341,
       "cols": 3,
-      "rows": 3,
+      "rows": 1,
       "cellW": 341,
       "cellH": 341,
-      "frameCount": 9,
-      "refH": 291,
+      "frameCount": 3,
+      "refH": 280,
       "frames": [
         {
           "cellX": 0,
           "cellY": 0,
           "cellW": 341,
           "cellH": 341,
-          "left": 44,
-          "top": 37,
-          "right": 286,
-          "bottom": 326,
-          "w": 243,
-          "h": 290,
-          "footGap": 14,
+          "left": 25,
+          "top": 57,
+          "right": 340,
+          "bottom": 336,
+          "w": 316,
+          "h": 280,
+          "footGap": 4,
           "local": {
-            "left": 44,
-            "top": 37,
-            "w": 243,
-            "h": 290
+            "left": 25,
+            "top": 57,
+            "w": 316,
+            "h": 280
           },
           "index": 0,
           "plant": true
@@ -1341,18 +1338,18 @@
           "cellY": 0,
           "cellW": 341,
           "cellH": 341,
-          "left": 386,
-          "top": 37,
-          "right": 626,
-          "bottom": 325,
-          "w": 241,
-          "h": 289,
-          "footGap": 15,
+          "left": 341,
+          "top": 68,
+          "right": 637,
+          "bottom": 332,
+          "w": 297,
+          "h": 265,
+          "footGap": 8,
           "local": {
-            "left": 45,
-            "top": 37,
-            "w": 241,
-            "h": 289
+            "left": 0,
+            "top": 68,
+            "w": 297,
+            "h": 265
           },
           "index": 1,
           "plant": false
@@ -1362,179 +1359,53 @@
           "cellY": 0,
           "cellW": 341,
           "cellH": 341,
-          "left": 723,
-          "top": 38,
-          "right": 966,
-          "bottom": 319,
-          "w": 244,
-          "h": 282,
-          "footGap": 21,
+          "left": 693,
+          "top": 0,
+          "right": 999,
+          "bottom": 340,
+          "w": 307,
+          "h": 341,
+          "footGap": 0,
           "local": {
-            "left": 41,
-            "top": 38,
-            "w": 244,
-            "h": 282
+            "left": 11,
+            "top": 0,
+            "w": 307,
+            "h": 341
           },
           "index": 2,
           "plant": false
-        },
-        {
-          "cellX": 0,
-          "cellY": 341,
-          "cellW": 341,
-          "cellH": 341,
-          "left": 44,
-          "top": 376,
-          "right": 286,
-          "bottom": 666,
-          "w": 243,
-          "h": 291,
-          "footGap": 15,
-          "local": {
-            "left": 44,
-            "top": 35,
-            "w": 243,
-            "h": 291
-          },
-          "index": 3,
-          "plant": true
-        },
-        {
-          "cellX": 341,
-          "cellY": 341,
-          "cellW": 341,
-          "cellH": 341,
-          "left": 385,
-          "top": 378,
-          "right": 625,
-          "bottom": 667,
-          "w": 241,
-          "h": 290,
-          "footGap": 14,
-          "local": {
-            "left": 44,
-            "top": 37,
-            "w": 241,
-            "h": 290
-          },
-          "index": 4,
-          "plant": false
-        },
-        {
-          "cellX": 682,
-          "cellY": 341,
-          "cellW": 341,
-          "cellH": 341,
-          "left": 722,
-          "top": 376,
-          "right": 963,
-          "bottom": 658,
-          "w": 242,
-          "h": 283,
-          "footGap": 23,
-          "local": {
-            "left": 40,
-            "top": 35,
-            "w": 242,
-            "h": 283
-          },
-          "index": 5,
-          "plant": false
-        },
-        {
-          "cellX": 0,
-          "cellY": 682,
-          "cellW": 341,
-          "cellH": 341,
-          "left": 44,
-          "top": 715,
-          "right": 287,
-          "bottom": 1007,
-          "w": 244,
-          "h": 293,
-          "footGap": 15,
-          "local": {
-            "left": 44,
-            "top": 33,
-            "w": 244,
-            "h": 293
-          },
-          "index": 6,
-          "plant": false
-        },
-        {
-          "cellX": 341,
-          "cellY": 682,
-          "cellW": 341,
-          "cellH": 341,
-          "left": 386,
-          "top": 716,
-          "right": 625,
-          "bottom": 1005,
-          "w": 240,
-          "h": 290,
-          "footGap": 17,
-          "local": {
-            "left": 45,
-            "top": 34,
-            "w": 240,
-            "h": 290
-          },
-          "index": 7,
-          "plant": false
-        },
-        {
-          "cellX": 682,
-          "cellY": 682,
-          "cellW": 341,
-          "cellH": 341,
-          "left": 725,
-          "top": 716,
-          "right": 966,
-          "bottom": 1006,
-          "w": 242,
-          "h": 291,
-          "footGap": 16,
-          "local": {
-            "left": 43,
-            "top": 34,
-            "w": 242,
-            "h": 291
-          },
-          "index": 8,
-          "plant": true
         }
       ],
-      "bytes": 849119
+      "bytes": 364002
     },
-    "warrior-run-sheet.png": {
-      "file": "warrior-run-sheet.png",
+    "warrior-roll-sheet.png": {
+      "file": "warrior-roll-sheet.png",
       "canvasW": 1024,
-      "canvasH": 1024,
+      "canvasH": 341,
       "cols": 3,
-      "rows": 3,
+      "rows": 1,
       "cellW": 341,
       "cellH": 341,
-      "frameCount": 9,
-      "refH": 295,
+      "frameCount": 3,
+      "refH": 251,
       "frames": [
         {
           "cellX": 0,
           "cellY": 0,
           "cellW": 341,
           "cellH": 341,
-          "left": 39,
-          "top": 35,
-          "right": 276,
-          "bottom": 331,
-          "w": 238,
-          "h": 297,
-          "footGap": 9,
+          "left": 28,
+          "top": 45,
+          "right": 340,
+          "bottom": 295,
+          "w": 313,
+          "h": 251,
+          "footGap": 45,
           "local": {
-            "left": 39,
-            "top": 35,
-            "w": 238,
-            "h": 297
+            "left": 28,
+            "top": 45,
+            "w": 313,
+            "h": 251
           },
           "index": 0,
           "plant": true
@@ -1544,18 +1415,18 @@
           "cellY": 0,
           "cellW": 341,
           "cellH": 341,
-          "left": 378,
-          "top": 35,
-          "right": 617,
-          "bottom": 330,
-          "w": 240,
-          "h": 296,
-          "footGap": 10,
+          "left": 341,
+          "top": 14,
+          "right": 681,
+          "bottom": 286,
+          "w": 341,
+          "h": 273,
+          "footGap": 54,
           "local": {
-            "left": 37,
-            "top": 35,
-            "w": 240,
-            "h": 296
+            "left": 0,
+            "top": 14,
+            "w": 341,
+            "h": 273
           },
           "index": 1,
           "plant": false
@@ -1565,150 +1436,24 @@
           "cellY": 0,
           "cellW": 341,
           "cellH": 341,
-          "left": 714,
-          "top": 35,
-          "right": 953,
-          "bottom": 326,
-          "w": 240,
-          "h": 292,
-          "footGap": 14,
+          "left": 682,
+          "top": 0,
+          "right": 981,
+          "bottom": 304,
+          "w": 300,
+          "h": 305,
+          "footGap": 36,
           "local": {
-            "left": 32,
-            "top": 35,
-            "w": 240,
-            "h": 292
+            "left": 0,
+            "top": 0,
+            "w": 300,
+            "h": 305
           },
           "index": 2,
           "plant": false
-        },
-        {
-          "cellX": 0,
-          "cellY": 341,
-          "cellW": 341,
-          "cellH": 341,
-          "left": 40,
-          "top": 374,
-          "right": 279,
-          "bottom": 666,
-          "w": 240,
-          "h": 293,
-          "footGap": 15,
-          "local": {
-            "left": 40,
-            "top": 33,
-            "w": 240,
-            "h": 293
-          },
-          "index": 3,
-          "plant": true
-        },
-        {
-          "cellX": 341,
-          "cellY": 341,
-          "cellW": 341,
-          "cellH": 341,
-          "left": 377,
-          "top": 374,
-          "right": 617,
-          "bottom": 660,
-          "w": 241,
-          "h": 287,
-          "footGap": 21,
-          "local": {
-            "left": 36,
-            "top": 33,
-            "w": 241,
-            "h": 287
-          },
-          "index": 4,
-          "plant": false
-        },
-        {
-          "cellX": 682,
-          "cellY": 341,
-          "cellW": 341,
-          "cellH": 341,
-          "left": 715,
-          "top": 374,
-          "right": 958,
-          "bottom": 660,
-          "w": 244,
-          "h": 287,
-          "footGap": 21,
-          "local": {
-            "left": 33,
-            "top": 33,
-            "w": 244,
-            "h": 287
-          },
-          "index": 5,
-          "plant": false
-        },
-        {
-          "cellX": 0,
-          "cellY": 682,
-          "cellW": 341,
-          "cellH": 341,
-          "left": 36,
-          "top": 712,
-          "right": 273,
-          "bottom": 997,
-          "w": 238,
-          "h": 286,
-          "footGap": 25,
-          "local": {
-            "left": 36,
-            "top": 30,
-            "w": 238,
-            "h": 286
-          },
-          "index": 6,
-          "plant": false
-        },
-        {
-          "cellX": 341,
-          "cellY": 682,
-          "cellW": 341,
-          "cellH": 341,
-          "left": 375,
-          "top": 712,
-          "right": 609,
-          "bottom": 1003,
-          "w": 235,
-          "h": 292,
-          "footGap": 19,
-          "local": {
-            "left": 34,
-            "top": 30,
-            "w": 235,
-            "h": 292
-          },
-          "index": 7,
-          "plant": false
-        },
-        {
-          "cellX": 682,
-          "cellY": 682,
-          "cellW": 341,
-          "cellH": 341,
-          "left": 714,
-          "top": 712,
-          "right": 952,
-          "bottom": 1005,
-          "w": 239,
-          "h": 294,
-          "footGap": 17,
-          "local": {
-            "left": 32,
-            "top": 30,
-            "w": 239,
-            "h": 294
-          },
-          "index": 8,
-          "plant": true
         }
       ],
-      "bytes": 850050
+      "bytes": 367854
     }
   }
 }
