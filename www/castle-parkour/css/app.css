@@ -746,6 +746,14 @@ html.mobile-ui .wrap {
 }
 html.mobile-ui .controls { display: flex; }
 html.desktop-ui .controls { display: none; }
+/* 双端兜底：宽屏精指针强制桌面触控隐藏，避免误判残留 */
+@media (min-width: 821px) and (pointer: fine) {
+  html.desktop-ui .controls,
+  html:not(.mobile-ui) .controls { display: none !important; }
+}
+@media (max-width: 820px) and (pointer: coarse) {
+  html.mobile-ui .controls { display: flex; }
+}
 html.mobile-ui,
 html.mobile-ui body {
   overscroll-behavior: none;

@@ -4651,45 +4651,54 @@ function loadImageAsset(a, onReady) {
     onReady?.();
     return;
   }
-  if (a.ready && a.img?.complete && a.img.width > 0) {
+  if (a.ready && a.img?.complete && (a.img.naturalWidth || a.img.width) > 0) {
     onReady?.();
     return;
   }
-  // 正在加载：挂等待队列（禁止 if (a.img) return 导致回调丢失）
   if (a._loading) {
     (a._waiters || (a._waiters = [])).push(onReady);
     return;
   }
   a._loading = true;
   a._waiters = onReady ? [onReady] : [];
-  // 失败重试时丢掉旧 img，避免卡在 broken / 无 onload
   const img = new Image();
   let settled = false;
-  const finish = (ok) => {
+  const finishOk = () => {
     if (settled) return;
-    settled = true;
     const w = img.naturalWidth || img.width || 0;
     const h = img.naturalHeight || img.height || 0;
-    a.ready = !!(ok && w > 0 && h > 0);
-    a.failed = !a.ready;
+    // complete 但尺寸未就绪：等真正的 onload，切勿 finish(false) 否则桌面端全失败
+    if (!(w > 0 && h > 0)) return;
+    settled = true;
+    a.ready = true;
+    a.failed = false;
     a._loading = false;
-    if (a.ready) applyManifestMeta(a);
+    applyManifestMeta(a);
     const waiters = a._waiters || [];
     a._waiters = null;
-    for (const wcb of waiters) {
-      try { wcb?.(); } catch (_) { /* ignore */ }
+    for (const cb of waiters) {
+      try { cb?.(); } catch (_) { /* ignore */ }
     }
   };
-  img.onload = () => finish(true);
-  img.onerror = () => finish(false);
+  const finishErr = () => {
+    if (settled) return;
+    settled = true;
+    a.ready = false;
+    a.failed = true;
+    a._loading = false;
+    const waiters = a._waiters || [];
+    a._waiters = null;
+    for (const cb of waiters) {
+      try { cb?.(); } catch (_) { /* ignore */ }
+    }
+  };
+  img.onload = finishOk;
+  img.onerror = finishErr;
   a.img = img;
   const src = a.src || '';
   img.src = src + (src.includes('?') ? '&' : '?') + 'v=' + ASSET_VER;
-  // 磁盘/HTTP 缓存命中时部分浏览器不触发 onload → 进度永远 0%
-  if (img.complete) {
-    if ((img.naturalWidth || img.width) > 0) finish(true);
-    else finish(false);
-  }
+  // 仅缓存命中且已有像素时同步完成；宽高为 0 的 complete 必须等 onload
+  if (img.complete && (img.naturalWidth || img.width) > 0) finishOk();
 }
 
 /** 美术尺寸真源：assets/sprite-manifest.json（生图后必须 measure 更新） */
@@ -4865,13 +4874,26 @@ function finishBootLoading() {
   document.documentElement.classList.add('assets-ready');
   hideBootOverlay();
   setStartButtonsEnabled(true);
-  refreshMainMenu();
-  if (document.getElementById('screen-char')?.classList.contains('active')) refreshCharScreen();
+  try { refreshMainMenu(); } catch (_) { /* ignore */ }
+  try {
+    if (document.getElementById('screen-char')?.classList.contains('active')) refreshCharScreen();
+  } catch (_) { /* ignore */ }
+}
+
+/** 双端兜底：清单/贴图异常时也不要永久卡在加载遮罩 */
+function armBootWatchdog() {
+  window.setTimeout(() => {
+    if (assetsReady) return;
+    console.warn('[castle-parkour] boot watchdog: force show menu');
+    tryNotifyGameplayReady();
+    finishBootLoading();
+    scheduleDeferredAssets();
+  }, 12000);
 }
 
 function noteAssetSettled() {
   assetsFinished += 1;
-  updateBootProgress(assetsFinished, assetsPending, '加载中…');
+  updateBootProgress(assetsFinished, Math.max(assetsPending, 1), '加载中…');
   if (assetsPending > 0 && assetsFinished >= assetsPending) {
     tryNotifyGameplayReady();
     finishBootLoading();
@@ -4975,8 +4997,12 @@ function loadPortraitAssets() {
   assetsFinished = 0;
   gameplayReady = false;
   updateBootProgress(0, 1, '读取清单…');
+  armBootWatchdog();
   loadSpriteManifest()
-    .catch(() => null)
+    .catch((err) => {
+      console.warn('[castle-parkour] manifest', err);
+      return null;
+    })
     .finally(() => {
       assetsPending = 0;
       assetsFinished = 0;
@@ -4985,15 +5011,14 @@ function loadPortraitAssets() {
         PORTRAIT_ASSETS.warrior,
         ...listCriticalGameplayAssets(),
       ];
-      // 先定总数再开拉，避免首帧 pending 还是 0
       const total = queue.length;
       updateBootProgress(0, Math.max(1, total), '加载中…');
       for (const a of queue) {
         if (!a) continue;
-        // 重置可能卡在 _loading 的旧状态
-        if (a._loading && !(a.ready && a.img?.width > 0)) {
+        if (a._loading && !(a.ready && (a.img?.naturalWidth || a.img?.width) > 0)) {
           a._loading = false;
           a.img = null;
+          a.failed = false;
         }
         trackImageAsset(a);
       }

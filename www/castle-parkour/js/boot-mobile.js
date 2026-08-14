@@ -2,14 +2,18 @@
   const BUILD_KEY = 'cp-build-id';
   const RELOAD_KEY = 'cp-build-reloading';
   /** 与 build-id.txt / ASSET_VER 同步；用于本地快路径，避免每次卡网络 */
-  const EMBEDDED_BUILD = '20260816t';
+  const EMBEDDED_BUILD = '20260816v';
 
   const detectMobileUi = () => {
+    // Chrome/Edge on Windows 常有 maxTouchPoints>0；笔记本短边 768 也会 ≤820——勿用「屏幕短边」判手机
     if (navigator.userAgentData?.mobile === true) return true;
+    if (navigator.userAgentData?.mobile === false) return false;
     if (/Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent)) return true;
-    const narrowTouch = navigator.maxTouchPoints > 0 && Math.min(window.innerWidth, window.innerHeight) <= 820;
-    const coarseSmall = window.matchMedia?.('(pointer: coarse)')?.matches && Math.min(screen.width, screen.height) <= 820;
-    return Boolean(narrowTouch || coarseSmall);
+    const narrow =
+      window.matchMedia?.('(max-width: 820px)')?.matches ??
+      window.innerWidth <= 820;
+    const coarse = window.matchMedia?.('(pointer: coarse)')?.matches ?? false;
+    return Boolean(narrow && (coarse || navigator.maxTouchPoints > 0));
   };
 
   const setupUi = () => {

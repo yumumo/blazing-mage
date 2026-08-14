@@ -1,4 +1,2 @@
-/** App entry (ES module). Waits for auto cache-bust boot. */
-const boot = window.__CP_BOOT || Promise.resolve();
-await boot;
-await import('./game.js');
+/** App entry — 静态导入，双端一致；不因 boot await 卡死 */
+import './game.js';
