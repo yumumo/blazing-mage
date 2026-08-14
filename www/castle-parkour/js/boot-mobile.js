@@ -1,6 +1,8 @@
 (() => {
   const BUILD_KEY = 'cp-build-id';
   const RELOAD_KEY = 'cp-build-reloading';
+  /** 与 build-id.txt / ASSET_VER 同步；用于本地快路径，避免每次卡网络 */
+  const EMBEDDED_BUILD = '20260816r';
 
   const detectMobileUi = () => {
     if (navigator.userAgentData?.mobile === true) return true;
@@ -14,17 +16,12 @@
     const mobileUi = detectMobileUi();
     window.__DEMO_DETECT_MOBILE_UI = detectMobileUi;
     window.__DEMO_MOBILE_UI = mobileUi;
+    window.__CP_BUILD = EMBEDDED_BUILD;
     document.documentElement.classList.add(mobileUi ? 'mobile-ui' : 'desktop-ui');
     document.documentElement.classList.add('assets-pending');
   };
 
   const clearSiteCaches = async () => {
-    try {
-      if (typeof caches !== 'undefined' && caches.keys) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k)));
-      }
-    } catch (_) { /* ignore */ }
     try {
       if (navigator.serviceWorker?.getRegistrations) {
         const regs = await navigator.serviceWorker.getRegistrations();
@@ -34,7 +31,6 @@
   };
 
   const hardReload = async (buildId) => {
-    // 防止死循环：同一次更新只强刷一次
     if (sessionStorage.getItem(RELOAD_KEY) === buildId) {
       localStorage.setItem(BUILD_KEY, buildId);
       sessionStorage.removeItem(RELOAD_KEY);
@@ -49,25 +45,26 @@
     return true;
   };
 
-  window.__CP_BOOT = (async () => {
-    setupUi();
-    let buildId = '';
-    try {
-      const res = await fetch('build-id.txt?t=' + Date.now(), { cache: 'no-store' });
-      if (res.ok) buildId = String(await res.text()).trim();
-    } catch (_) { /* offline / file:// */ }
-    if (!buildId) return;
-    window.__CP_BUILD = buildId;
-    const prev = localStorage.getItem(BUILD_KEY);
-    if (prev && prev !== buildId) {
-      const reloading = await hardReload(buildId);
-      if (reloading) {
-        // 挂起后续模块，等页面被替换
-        await new Promise(() => {});
+  // 不阻塞进游戏：UI 立刻好；版本探针后台跑
+  setupUi();
+  window.__CP_BOOT = Promise.resolve();
+
+  const prev = localStorage.getItem(BUILD_KEY);
+  if (!prev) localStorage.setItem(BUILD_KEY, EMBEDDED_BUILD);
+
+  fetch('build-id.txt?t=' + Date.now(), { cache: 'no-store' })
+    .then(async (res) => {
+      if (!res.ok) return;
+      const buildId = String(await res.text()).trim();
+      if (!buildId) return;
+      window.__CP_BUILD = buildId;
+      const stored = localStorage.getItem(BUILD_KEY);
+      if (stored && stored !== buildId) {
+        await hardReload(buildId);
+        return;
       }
-      return;
-    }
-    localStorage.setItem(BUILD_KEY, buildId);
-    sessionStorage.removeItem(RELOAD_KEY);
-  })();
+      localStorage.setItem(BUILD_KEY, buildId);
+      sessionStorage.removeItem(RELOAD_KEY);
+    })
+    .catch(() => { /* offline */ });
 })();

@@ -4675,11 +4675,8 @@ function loadImageAsset(a, onReady) {
     }
   };
   img.onload = () => {
-    if (typeof img.decode === 'function') {
-      img.decode().then(() => finish(true)).catch(() => finish(img.width > 0));
-    } else {
-      finish(true);
-    }
+    // 不强制 decode()：手机上会串行拖慢首启；Canvas 绘制前浏览器会解码
+    finish(true);
   };
   img.onerror = () => finish(false);
   a.img = img;
@@ -4913,47 +4910,48 @@ function tryNotifyGameplayReady() {
   return true;
 }
 
-/** 局内资源清单：出战角色优先，世界物次之，另一角色垫后 */
-function listGameplayAssets() {
+/** 开跑必需：出战角色动作 + 跑步/翻滚 */
+function listCriticalGameplayAssets() {
+  const id = selectedChar === 'warrior' ? 'warrior' : 'mage';
+  return [
+    ...Object.values(CHAR_SPRITES[id] || {}),
+    CHAR_RUN_SHEETS[id],
+    CHAR_ROLL_SHEETS[id],
+  ].filter(Boolean);
+}
+
+/** 可延后：世界物 + 另一角色 */
+function listDeferredGameplayAssets() {
   const primary = selectedChar === 'warrior' ? 'warrior' : 'mage';
   const secondary = primary === 'mage' ? 'warrior' : 'mage';
-  const list = [];
-  const addChar = (id) => {
-    for (const frame of Object.values(CHAR_SPRITES[id] || {})) list.push(frame);
-    list.push(CHAR_RUN_SHEETS[id], CHAR_ROLL_SHEETS[id]);
-  };
-  addChar(primary);
-  for (const frame of Object.values(WORLD_ASSETS)) list.push(frame);
-  addChar(secondary);
+  const list = [...Object.values(WORLD_ASSETS)];
+  for (const frame of Object.values(CHAR_SPRITES[secondary] || {})) list.push(frame);
+  list.push(CHAR_RUN_SHEETS[secondary], CHAR_ROLL_SHEETS[secondary]);
   return list.filter(Boolean);
 }
 
-function prefetchGameplayAssets() {
-  const list = listGameplayAssets();
+function loadAssetList(list, onOne) {
   const need = list.filter((a) => a && !(a.ready && a.img?.width > 0));
-  gameplayPending = Math.max(1, need.length);
-  gameplayFinished = 0;
-  const bump = () => {
-    gameplayFinished += 1;
-    // 出战跑步表一好就可开跑；其余继续后台
-    if (tryNotifyGameplayReady()) return;
-    if (gameplayFinished >= gameplayPending) {
-      // 跑步表仍失败：再试一次出战 run
-      const id = selectedChar === 'warrior' ? 'warrior' : 'mage';
-      const run = CHAR_RUN_SHEETS[id];
-      if (run && !run.ready) {
-        run.failed = false;
-        run.img = null;
-        run._loading = false;
-        loadImageAsset(run, () => { tryNotifyGameplayReady(); });
-      }
-    }
-  };
-  if (need.length === 0) {
+  if (!need.length) return 0;
+  for (const a of need) loadImageAsset(a, () => onOne?.(a));
+  return need.length;
+}
+
+function scheduleDeferredAssets() {
+  const defer = () => loadAssetList(listDeferredGameplayAssets(), () => {});
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(defer, { timeout: 1500 });
+  else setTimeout(defer, 500);
+}
+
+function prefetchGameplayAssets() {
+  const critical = listCriticalGameplayAssets();
+  let left = loadAssetList(critical, () => {
     tryNotifyGameplayReady();
-    return;
-  }
-  for (const a of need) loadImageAsset(a, bump);
+    left -= 1;
+    if (left <= 0) scheduleDeferredAssets();
+  });
+  tryNotifyGameplayReady();
+  if (left === 0) scheduleDeferredAssets();
 }
 
 /** 首启只等立绘：菜单可进；局内贴图后台预取 */
