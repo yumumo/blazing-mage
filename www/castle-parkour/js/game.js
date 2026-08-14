@@ -4662,26 +4662,34 @@ function loadImageAsset(a, onReady) {
   }
   a._loading = true;
   a._waiters = onReady ? [onReady] : [];
+  // 失败重试时丢掉旧 img，避免卡在 broken / 无 onload
   const img = new Image();
+  let settled = false;
   const finish = (ok) => {
-    a.ready = !!(ok && img.width > 0 && img.height > 0);
+    if (settled) return;
+    settled = true;
+    const w = img.naturalWidth || img.width || 0;
+    const h = img.naturalHeight || img.height || 0;
+    a.ready = !!(ok && w > 0 && h > 0);
     a.failed = !a.ready;
     a._loading = false;
     if (a.ready) applyManifestMeta(a);
     const waiters = a._waiters || [];
     a._waiters = null;
-    for (const w of waiters) {
-      try { w?.(); } catch (_) { /* ignore */ }
+    for (const wcb of waiters) {
+      try { wcb?.(); } catch (_) { /* ignore */ }
     }
   };
-  img.onload = () => {
-    // 不强制 decode()：手机上会串行拖慢首启；Canvas 绘制前浏览器会解码
-    finish(true);
-  };
+  img.onload = () => finish(true);
   img.onerror = () => finish(false);
   a.img = img;
   const src = a.src || '';
   img.src = src + (src.includes('?') ? '&' : '?') + 'v=' + ASSET_VER;
+  // 磁盘/HTTP 缓存命中时部分浏览器不触发 onload → 进度永远 0%
+  if (img.complete) {
+    if ((img.naturalWidth || img.width) > 0) finish(true);
+    else finish(false);
+  }
 }
 
 /** 美术尺寸真源：assets/sprite-manifest.json（生图后必须 measure 更新） */
@@ -4966,23 +4974,35 @@ function loadPortraitAssets() {
   assetsPending = 0;
   assetsFinished = 0;
   gameplayReady = false;
-  updateBootProgress(0, 1, '准备中…');
-  loadSpriteManifest().finally(() => {
-    assetsPending = 0;
-    assetsFinished = 0;
-    const queue = [
-      PORTRAIT_ASSETS.mage,
-      PORTRAIT_ASSETS.warrior,
-      ...listCriticalGameplayAssets(),
-    ];
-    updateBootProgress(0, Math.max(1, queue.length), '加载中…');
-    for (const a of queue) trackImageAsset(a);
-    if (assetsPending === 0) {
-      tryNotifyGameplayReady();
-      finishBootLoading();
-      scheduleDeferredAssets();
-    }
-  });
+  updateBootProgress(0, 1, '读取清单…');
+  loadSpriteManifest()
+    .catch(() => null)
+    .finally(() => {
+      assetsPending = 0;
+      assetsFinished = 0;
+      const queue = [
+        PORTRAIT_ASSETS.mage,
+        PORTRAIT_ASSETS.warrior,
+        ...listCriticalGameplayAssets(),
+      ];
+      // 先定总数再开拉，避免首帧 pending 还是 0
+      const total = queue.length;
+      updateBootProgress(0, Math.max(1, total), '加载中…');
+      for (const a of queue) {
+        if (!a) continue;
+        // 重置可能卡在 _loading 的旧状态
+        if (a._loading && !(a.ready && a.img?.width > 0)) {
+          a._loading = false;
+          a.img = null;
+        }
+        trackImageAsset(a);
+      }
+      if (assetsPending === 0) {
+        tryNotifyGameplayReady();
+        finishBootLoading();
+        scheduleDeferredAssets();
+      }
+    });
 }
 
 /** 世界精灵整图绘制：anchor 'center' | 'feet'；尺寸来自 manifest content 盒 */
