@@ -55,8 +55,11 @@ import {
   GAP_DEPTH,
   GAP_W_LATE_MIN,
   GAP_W_LATE_MAX,
-  LAYER_H,
-  LAYER2_TOP,
+  PLATFORM_H,
+  PLATFORM_H3,
+  PLATFORM_W_HALF,
+  PLATFORM_W_THIRD,
+  PLATFORM_L2_TAIL,
   SPIKE_H,
   SPIKE_W,
   FLYER_BASE_Y,
@@ -73,7 +76,6 @@ import {
   ENERGY_MAX,
   ENERGY_COST,
   ENERGY_REGEN,
-  TUTORIAL_END,
   TUTORIAL_LEAD_PX,
   CASTLE_FONT,
 } from './config/index.js';
@@ -1086,30 +1088,32 @@ function genStep() {
   platformAfterGap++;
 }
 
-/** 一片高台：267 与 400(+三级) 成组，中间留空；失败则整片不放 */
+/** 一片高台：三分台 + 半台(+三级叠尾) 成组；尺寸真源 gameplay.js PLATFORM_* */
 function spawnElevatedCluster(startX) {
   const gap = 100;
   const halfFirst = Math.random() < 0.5;
   const parts = halfFirst
-    ? [{ w: 400, half: true }, { w: 267, half: false }]
-    : [{ w: 267, half: false }, { w: 400, half: true }];
+    ? [{ w: PLATFORM_W_HALF, half: true }, { w: PLATFORM_W_THIRD, half: false }]
+    : [{ w: PLATFORM_W_THIRD, half: false }, { w: PLATFORM_W_HALF, half: true }];
+  /** 半台预留：二级宽 + 三级伸出（叠在末 PLATFORM_L2_TAIL） */
+  const halfReserve = PLATFORM_W_HALF + PLATFORM_W_THIRD - PLATFORM_L2_TAIL;
 
   let x = startX;
   const planned = [];
   for (const part of parts) {
-    const needW = part.half ? 600 : part.w;
+    const needW = part.half ? halfReserve : part.w;
     if (!isRangeFree(x, needW) || nearDuckHazards(x, needW)) return false;
     planned.push({ x, part, needW });
     x += needW + gap;
   }
 
   for (const { x: px0, part } of planned) {
-    elevatedPlatforms.push({ x0: px0, x1: px0 + part.w, y: 80 });
-    spawnElevatedDecor(px0, px0 + part.w, 80);
+    elevatedPlatforms.push({ x0: px0, x1: px0 + part.w, y: PLATFORM_H });
+    spawnElevatedDecor(px0, px0 + part.w, PLATFORM_H);
     if (part.half) {
-      const t0 = px0 + 333;
-      elevatedPlatforms.push({ x0: t0, x1: t0 + 267, y: 120 });
-      spawnElevatedDecor(t0, t0 + 267, 120);
+      const t0 = px0 + (PLATFORM_W_HALF - PLATFORM_L2_TAIL);
+      elevatedPlatforms.push({ x0: t0, x1: t0 + PLATFORM_W_THIRD, y: PLATFORM_H3 });
+      spawnElevatedDecor(t0, t0 + PLATFORM_W_THIRD, PLATFORM_H3);
     }
   }
   return true;
@@ -5001,10 +5005,6 @@ function scheduleDeferredAssets() {
   const defer = () => loadAssetList(listDeferredGameplayAssets(), () => {});
   if (typeof requestIdleCallback === 'function') requestIdleCallback(defer, { timeout: 1500 });
   else setTimeout(defer, 500);
-}
-
-function prefetchGameplayAssets() {
-  // 进度已并入 loadPortraitAssets（立绘 + 开跑必需）
 }
 
 /** 首启：立绘 + 出战角色开跑资源计入同一进度条，到 100% 再进菜单 */

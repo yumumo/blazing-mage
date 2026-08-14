@@ -11,6 +11,7 @@ desktop.ini
 
 # caches / build / smoke
 _smoke_*
+smoke-out/
 progress.md
 .wrangler/
 dist/
@@ -22,6 +23,7 @@ __pycache__/
 *.tmp
 *.temp
 *.local-bak
+*.pre-unify.bak
 
 # 美术管线中间态（品红源与抠图只留本机）
 dev/art-raw/
@@ -31,9 +33,20 @@ dev/.cursor-core/
 # 误放的重复目录（真源是 dev/art-raw/）
 www/dev/
 
+# Pages 产物根下禁止冒烟 / 临时脚本（真源工具在仓库根 dev/）
+www/castle-parkour/dev/
+
 # 旧跑步散帧：局内只用 *-run-sheet.png
 www/castle-parkour/assets/mage-run[0-9].png
 www/castle-parkour/assets/warrior-run[0-9].png
 
+# 管线验收表 / 调试图：勿进 Pages（真源在 dev/art-sheets/）
+www/castle-parkour/assets/*-jump-sheet.png
+www/castle-parkour/assets/*-atk-sheet.png
+www/castle-parkour/assets/*-before-scale.png
+www/castle-parkour/assets/monster-walk-sheet.png
+www/castle-parkour/assets/portal-framed.png
+
 # editor / agent 副本（规则与 skill 在主仓 XRK-AGT）
 .cursor/
+.claude/

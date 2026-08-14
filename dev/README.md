@@ -9,10 +9,12 @@
 
 | 路径 | 入库？ | 内容 |
 |------|--------|------|
-| `www/castle-parkour/assets/` | ✅ | 局内 PNG + `sprite-manifest.json` |
+| `www/castle-parkour/assets/` | ✅ | **局内** PNG + `sprite-manifest.json` |
 | `www/castle-parkour/js/` | ✅ | 游戏逻辑与 `config/` |
 | `dev/*.py` | ✅ | 对齐 / 入库脚本 |
+| `dev/art-sheets/` | ✅ | 跳/攻验收 sheet（不进 Pages） |
 | `dev/art-raw/` | ❌ | 品红 / keyed / 调试图 |
+| `www/castle-parkour/dev/` | ❌ | 禁止（冒烟） |
 | `www/dev/` | ❌ | 禁止（误放） |
 
 ## 入库脚本（仅这些）

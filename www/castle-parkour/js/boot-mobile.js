@@ -4,7 +4,7 @@
   const MIRROR_KEY = 'cp-mirror-skip';
   const BASE_KEY = 'cp-asset-base';
   /** 与 build-id.txt / ASSET_VER 同步 */
-  const EMBEDDED_BUILD = '20260816x';
+  const EMBEDDED_BUILD = '20260816y';
 
   /**
    * 国内可达镜像（GitHub raw via jsDelivr 系）。

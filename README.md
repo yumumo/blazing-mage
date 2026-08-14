@@ -44,8 +44,14 @@
 
 ## 技术说明
 
-本仓库为可独立发布的静态页游戏（Cloudflare Pages 产物为 `www/castle-parkour/`）。目录分区：`index.html` 壳 + `css/` + `js/`（`config/` 为角色/世界扩展点）+ `assets/`。若嵌在 XRK-AGT 中，挂载路径为 `/castle-parkour`。
+本仓库为可独立发布的静态页游戏（Cloudflare Pages 产物为 `www/castle-parkour/`）。目录分区：
 
-**局内用哪些 PNG**：见 [www/castle-parkour/ASSETS.md](www/castle-parkour/ASSETS.md)（立绘 / run-sheet / roll-sheet / 世界物；勿用 `*-run0.png` 散帧）。
+| 路径 | 进站 | 说明 |
+|------|:----:|------|
+| `www/castle-parkour/` | ✅ | 游戏壳、`js/`、`css/`、**局内** `assets/` |
+| `dev/*.py` · `dev/art-sheets/` | ❌ | 美术管线；验收 sheet 不进 CDN |
+| `dev/art-raw/` | ❌ | gitignore |
 
-首启只加载立绘进菜单，局内贴图后台预取；点开始若未齐会短暂显示「准备关卡…」。改资源后 bump `ASSET_VER`，并同步 `build-id.txt` 与 `index.html` 的 `?v=`——玩家下次打开会**自动强刷**一次（见 `boot-mobile.js`）。
+局内 PNG 清单：[www/castle-parkour/ASSETS.md](www/castle-parkour/ASSETS.md)。扩展点：`js/config/`（角色 / 世界 / `PLATFORM_*` 等）。
+
+首启加载立绘 + 出战角色开跑资源；世界与另一角色 idle 预取。改资源后 bump `ASSET_VER`，并同步 `build-id.txt`、`index.html` 的 `?v=`、`boot-mobile.js` 的 `EMBEDDED_BUILD`——**仅版本变化**时自动硬刷一次。

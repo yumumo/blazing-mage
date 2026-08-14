@@ -6,7 +6,7 @@
  * 2. Drop PNGs into assets/ and refresh sprite-manifest.json
  * 3. Wire unlock/shop UI in game.js if needed
  */
-export const ASSET_VER = '20260816x';
+export const ASSET_VER = '20260816y';
 
 export const CHAR_NAMES = { mage: '法师', warrior: '战士' };
 
