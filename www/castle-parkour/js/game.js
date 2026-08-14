@@ -34,6 +34,7 @@ import {
   BAT_W,
   BAT_H,
   BAT_EXTRA_VX,
+  BAT_Y,
   ROLL_DUR,
   ROLL_SPEED_BOOST,
   ROLL_CD,
@@ -917,12 +918,9 @@ function trySpawnObstacle(x0, x1, d) {
 }
 
 function trySpawnBat(d) {
-  // 只在第 2 层高度带巡航，从更远屏外进入，不冲脸
+  // 固定第二层高度巡航，从更远屏外进入，不冲脸
   if (d <= 110 || bonusActive || Math.random() >= 0.038) return;
-  const yTop = GROUND - LAYER2_TOP - LAYER_H + 6;
-  const yBot = GROUND - LAYER2_TOP - 6;
-  const by = yTop + Math.random() * Math.max(8, yBot - yTop);
-  bats.push({ x: W + 420, y: by, y0: by, phase: Math.random() * 6.28, hp: 1 });
+  bats.push({ x: W + 420, y: BAT_Y, y0: BAT_Y, phase: Math.random() * 6.28, hp: 1 });
 }
 
 // ===================== 世界生成 =====================
@@ -1214,7 +1212,17 @@ function reset() {
 }
 
 function beginRun() {
-  if (!assetsReady || !gameplayReady) return;
+  if (!assetsReady) return;
+  if (!primaryRunSheetReady()) {
+    showBootOverlay('准备角色…');
+    setStartButtonsEnabled(false);
+    whenGameplayReady().then(() => {
+      hideBootOverlay();
+      setStartButtonsEnabled(true);
+      beginRun();
+    });
+    return;
+  }
   platforms = []; gaps = []; walls = []; beams = [];
   monsters = []; fireballs = []; floats = []; coins = [];
   elevatedPlatforms = []; spikes = []; flyers = []; bats = [];
@@ -1797,12 +1805,9 @@ function update(dt) {
   for (const f of flyers) f.x -= spd * dt;
   for (const b of bats) {
     b.x -= (spd + BAT_EXTRA_VX) * dt;
-    const y0 = b.y0 ?? b.y;
-    const yTop = GROUND - LAYER2_TOP - LAYER_H + 4;
-    const yBot = GROUND - LAYER2_TOP - 4;
-    b.y = y0 + Math.sin(animT * 2.2 + b.phase) * 10;
-    if (b.y < yTop) b.y = yTop;
-    if (b.y > yBot) b.y = yBot;
+    // 锁在第二层：小幅振翅，不离开 BAT_Y
+    const y0 = b.y0 ?? BAT_Y;
+    b.y = y0 + Math.sin(animT * 2.2 + b.phase) * 6;
   }
   for (const c of coins) c.x -= spd * dt;
   for (const p of powerups) p.x -= spd * dt;
@@ -3842,7 +3847,10 @@ function drawPlayer() {
   const sprite = pickCharSprite(isWarrior() ? 'warrior' : 'mage');
   if (sprite && drawCharSprite(cx, cy, bob, sprite)) return;
 
-  // sprites not ready: no vector fallback
+  // 跑步表未就绪时用跳跃散帧兜底，避免手机端「有碰撞无角色」
+  const frames = CHAR_SPRITES[isWarrior() ? 'warrior' : 'mage'];
+  const fallback = firstReadySprite(frames?.jumpLand, frames?.jumpAnt, frames?.jump, frames?.fly);
+  if (fallback) drawCharSprite(cx, cy, bob, fallback);
   ctx.globalAlpha = 1;
 }
 
@@ -4639,17 +4647,44 @@ function talentDesc(lv) {
 
 
 function loadImageAsset(a, onReady) {
-  if (a.img) return;
-  const img = new Image();
-  img.onload = () => {
-    a.ready = true;
-    applyManifestMeta(a);
+  if (!a) {
     onReady?.();
+    return;
+  }
+  if (a.ready && a.img?.complete && a.img.width > 0) {
+    onReady?.();
+    return;
+  }
+  // 正在加载：挂等待队列（禁止 if (a.img) return 导致回调丢失）
+  if (a._loading) {
+    (a._waiters || (a._waiters = [])).push(onReady);
+    return;
+  }
+  a._loading = true;
+  a._waiters = onReady ? [onReady] : [];
+  const img = new Image();
+  const finish = (ok) => {
+    a.ready = !!(ok && img.width > 0 && img.height > 0);
+    a.failed = !a.ready;
+    a._loading = false;
+    if (a.ready) applyManifestMeta(a);
+    const waiters = a._waiters || [];
+    a._waiters = null;
+    for (const w of waiters) {
+      try { w?.(); } catch (_) { /* ignore */ }
+    }
   };
-  img.onerror = () => { a.ready = false; a.failed = true; onReady?.(); };
+  img.onload = () => {
+    if (typeof img.decode === 'function') {
+      img.decode().then(() => finish(true)).catch(() => finish(img.width > 0));
+    } else {
+      finish(true);
+    }
+  };
+  img.onerror = () => finish(false);
+  a.img = img;
   const src = a.src || '';
   img.src = src + (src.includes('?') ? '&' : '?') + 'v=' + ASSET_VER;
-  a.img = img;
 }
 
 /** 美术尺寸真源：assets/sprite-manifest.json（生图后必须 measure 更新） */
@@ -4848,8 +4883,34 @@ function notifyGameplayReady() {
 }
 
 function whenGameplayReady() {
-  if (gameplayReady) return Promise.resolve();
-  return new Promise((resolve) => gameplayWaiters.push(resolve));
+  if (gameplayReady && primaryRunSheetReady()) return Promise.resolve();
+  gameplayReady = false;
+  return new Promise((resolve) => {
+    gameplayWaiters.push(resolve);
+    const id = selectedChar === 'warrior' ? 'warrior' : 'mage';
+    const run = CHAR_RUN_SHEETS[id];
+    if (run && !primaryRunSheetReady()) {
+      run.failed = false;
+      run._loading = false;
+      if (!run.ready) run.img = null;
+      loadImageAsset(run, () => { tryNotifyGameplayReady(); });
+    } else {
+      tryNotifyGameplayReady();
+    }
+  });
+}
+
+/** 开跑最低要求：出战角色跑步表已解码（手机上失败则看不见人） */
+function primaryRunSheetReady() {
+  const id = selectedChar === 'warrior' ? 'warrior' : 'mage';
+  const run = CHAR_RUN_SHEETS[id];
+  return !!(run?.ready && run.img?.width > 0 && (run.frames?.length || run.cols));
+}
+
+function tryNotifyGameplayReady() {
+  if (!primaryRunSheetReady()) return false;
+  notifyGameplayReady();
+  return true;
 }
 
 /** 局内资源清单：出战角色优先，世界物次之，另一角色垫后 */
@@ -4868,19 +4929,31 @@ function listGameplayAssets() {
 }
 
 function prefetchGameplayAssets() {
-  const list = listGameplayAssets().filter((a) => a && !a.img);
-  gameplayPending = list.length;
+  const list = listGameplayAssets();
+  const need = list.filter((a) => a && !(a.ready && a.img?.width > 0));
+  gameplayPending = Math.max(1, need.length);
   gameplayFinished = 0;
-  if (gameplayPending === 0) {
-    notifyGameplayReady();
+  const bump = () => {
+    gameplayFinished += 1;
+    // 出战跑步表一好就可开跑；其余继续后台
+    if (tryNotifyGameplayReady()) return;
+    if (gameplayFinished >= gameplayPending) {
+      // 跑步表仍失败：再试一次出战 run
+      const id = selectedChar === 'warrior' ? 'warrior' : 'mage';
+      const run = CHAR_RUN_SHEETS[id];
+      if (run && !run.ready) {
+        run.failed = false;
+        run.img = null;
+        run._loading = false;
+        loadImageAsset(run, () => { tryNotifyGameplayReady(); });
+      }
+    }
+  };
+  if (need.length === 0) {
+    tryNotifyGameplayReady();
     return;
   }
-  for (const a of list) {
-    loadImageAsset(a, () => {
-      gameplayFinished += 1;
-      if (gameplayFinished >= gameplayPending) notifyGameplayReady();
-    });
-  }
+  for (const a of need) loadImageAsset(a, bump);
 }
 
 /** 首启只等立绘：菜单可进；局内贴图后台预取 */
@@ -4930,11 +5003,10 @@ function firstReadySprite(...assets) {
 
 function pickRunSheet(charId) {
   const sheet = CHAR_RUN_SHEETS[charId];
-  if (!sheet?.ready || !sheet.img) return null;
+  if (!sheet?.ready || !sheet.img?.width) return null;
   const frames = ensureSheetFrames(sheet);
   if (!frames?.length) return null;
   const n = frames.length;
-  // 法师 / 战士跑帧
   const RUN_FPS = 10;
   const idx = Math.floor(animT * RUN_FPS) % n;
   const frame = frames[idx];
@@ -5040,28 +5112,43 @@ function ensureRunFootAnchors(sheet) {
 function resolveRunFrameLayout(pick) {
   const { sheet, frame, charId } = pick || {};
   const img = sheet?.img;
-  if (!img || !frame) return null;
+  if (!img?.width || !frame) return null;
   ensureRunFootAnchors(sheet);
 
   const cellX = frame.cellX ?? 0;
   const cellW = frame.cellW || 0;
   const hasContent = frame.w > 0 && frame.h > 0;
-  const srcT = hasContent ? frame.top : (frame.cellY ?? 0);
-  const srcH = hasContent ? frame.h : (frame.cellH || img.height);
+  let srcT = hasContent ? frame.top : (frame.cellY ?? 0);
+  let srcH = hasContent ? frame.h : (frame.cellH || img.height);
+  let srcL;
+  let srcW;
 
-  const footAbsX = cellX + (sheet.runFootLocalX ?? ((frame.w || cellW) * 0.5));
-  let srcW = sheet.runLockW || frame.w || cellW || 1;
-  let srcL = Math.round(footAbsX - srcW * 0.5);
-  if (cellW > 0) {
+  const footAbsX = cellX + (sheet.runFootLocalX ?? ((frame.w || cellW || img.width) * 0.5));
+  const lockW = sheet.runLockW || 0;
+  if (lockW >= 8 && cellW > 0) {
+    srcW = lockW;
+    srcL = Math.round(footAbsX - srcW * 0.5);
     const cellRight = cellX + cellW;
     if (srcL < cellX) srcL = cellX;
     if (srcL + srcW > cellRight) srcL = Math.max(cellX, cellRight - srcW);
     srcW = Math.min(srcW, cellRight - srcL);
+  } else if (hasContent) {
+    srcL = frame.left;
+    srcW = frame.w;
+  } else {
+    srcL = cellX;
+    srcW = cellW || img.width;
   }
-  if (!srcW || !srcH) return null;
+
+  // 裁切越界保护（部分手机 drawImage 越界直接空白）
+  if (srcL < 0) { srcW += srcL; srcL = 0; }
+  if (srcT < 0) { srcH += srcT; srcT = 0; }
+  if (srcL + srcW > img.width) srcW = img.width - srcL;
+  if (srcT + srcH > img.height) srcH = img.height - srcT;
+  if (!(srcW > 0 && srcH > 0)) return null;
 
   const scale = charBodyScale(charId);
-  const ax = footAbsX - srcL;
+  const ax = Math.max(0, Math.min(srcW, footAbsX - srcL));
   return {
     srcL, srcT, srcW, srcH,
     ax,
@@ -5074,14 +5161,21 @@ function resolveRunFrameLayout(pick) {
 function drawRunSheetSprite(cx, cy, bob, pick) {
   const img = pick?.sheet?.img;
   const layout = resolveRunFrameLayout(pick);
-  if (!img || !layout) return false;
+  if (!img?.width || !layout) return false;
   const { srcL, srcT, srcW, srcH, ax, dw, dh, scale } = layout;
+  if (!(dw > 0 && dh > 0)) return false;
   const yBob = heightAboveSupport() > 10 ? bob : 0;
 
   ctx.save();
   playerInvincibleFlicker(0.45);
   ctx.translate(cx, cy + yBob);
-  ctx.drawImage(img, srcL, srcT, srcW, srcH, -ax * scale, -dh, dw, dh);
+  try {
+    ctx.drawImage(img, srcL, srcT, srcW, srcH, -ax * scale, -dh, dw, dh);
+  } catch (_) {
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    return false;
+  }
   ctx.restore();
   ctx.globalAlpha = 1;
   return true;

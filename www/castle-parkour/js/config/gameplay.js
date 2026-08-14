@@ -38,6 +38,8 @@ export const ORBIT_SEEK_RANGE = 280;
 export const BAT_W = 34;
 export const BAT_H = 26;
 export const BAT_EXTRA_VX = 12;
+/** 蝙蝠固定第二层高度（画布 Y：二级台顶上方 24px） */
+export const BAT_Y = GROUND - 2 * U - 24;
 
 export const ROLL_DUR = 0.55;
 export const ROLL_SPEED_BOOST = 200;

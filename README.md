@@ -40,4 +40,4 @@
 
 **局内用哪些 PNG**：见 [www/castle-parkour/ASSETS.md](www/castle-parkour/ASSETS.md)（立绘 / run-sheet / roll-sheet / 世界物；勿用 `*-run0.png` 散帧）。
 
-首启只加载立绘进菜单，局内贴图后台预取；点开始若未齐会短暂显示「准备关卡…」。改资源后 bump `ASSET_VER` 并同步 `index.html` 的 `?v=`。
+首启只加载立绘进菜单，局内贴图后台预取；点开始若未齐会短暂显示「准备关卡…」。改资源后 bump `ASSET_VER`，并同步 `build-id.txt` 与 `index.html` 的 `?v=`——玩家下次打开会**自动强刷**一次（见 `boot-mobile.js`）。

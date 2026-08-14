@@ -2,7 +2,12 @@
 
 改贴图 / 上传前先对这份清单。运行时只认 `www/castle-parkour/assets/` + `js/config/characters.js` / `world.js` 里登记的路径。
 
-缓存戳：`ASSET_VER`（`js/config/characters.js`）须与 `index.html` 里 `boot-mobile.js` / `app.css` / `main.js` 的 `?v=` 同步。
+缓存戳：`ASSET_VER`（`js/config/characters.js`）须与下列同步：
+
+- `build-id.txt`（首启自动强刷探针，**改版本必改这一行**）
+- `index.html` 里 `boot-mobile.js` / `app.css` / `main.js` 的 `?v=`
+
+发版后玩家下次打开会比对 `build-id.txt`；若与本地不同则清 Cache Storage / SW 并自动重载一次。
 
 ## 加载策略
 
