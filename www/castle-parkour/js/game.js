@@ -1200,6 +1200,21 @@ function enterBonusSpace() {
 // ===================== 游戏控制 =====================
 function reset() {
   if (!assetsReady) return;
+  if (!gameplayReady) {
+    showBootOverlay('准备关卡…');
+    setStartButtonsEnabled(false);
+    whenGameplayReady().then(() => {
+      hideBootOverlay();
+      setStartButtonsEnabled(true);
+      beginRun();
+    });
+    return;
+  }
+  beginRun();
+}
+
+function beginRun() {
+  if (!assetsReady || !gameplayReady) return;
   platforms = []; gaps = []; walls = []; beams = [];
   monsters = []; fireballs = []; floats = []; coins = [];
   elevatedPlatforms = []; spikes = []; flyers = []; bats = [];
@@ -4711,7 +4726,7 @@ function ensureSpriteMeta(asset) {
 }
 
 function loadSpriteManifest() {
-  return fetch('assets/sprite-manifest.json?v=' + ASSET_VER, { cache: 'no-cache' })
+  return fetch('assets/sprite-manifest.json?v=' + ASSET_VER)
     .then((r) => (r.ok ? r.json() : null))
     .then((data) => {
       if (!data?.sprites) return;
@@ -4753,9 +4768,13 @@ function loadSpriteManifest() {
     .catch(() => {});
 }
 
-let assetsReady = false;
+let assetsReady = false;       // 主菜单可用（立绘 + manifest）
+let gameplayReady = false;     // 局内贴图齐（可开跑）
 let assetsPending = 0;
 let assetsFinished = 0;
+let gameplayPending = 0;
+let gameplayFinished = 0;
+const gameplayWaiters = [];
 
 function setStartButtonsEnabled(on) {
   for (const id of ['menu-start', 'start']) {
@@ -4764,17 +4783,30 @@ function setStartButtonsEnabled(on) {
   }
 }
 
+function hideBootOverlay() {
+  const boot = document.getElementById('boot-loading');
+  if (!boot) return;
+  boot.classList.add('is-done');
+  boot.setAttribute('aria-busy', 'false');
+  window.setTimeout(() => { boot.hidden = true; }, 280);
+}
+
+function showBootOverlay(text) {
+  const boot = document.getElementById('boot-loading');
+  if (!boot) return;
+  boot.hidden = false;
+  boot.classList.remove('is-done');
+  boot.setAttribute('aria-busy', 'true');
+  const bootText = document.querySelector('.boot-loading-text');
+  if (bootText && text) bootText.textContent = text;
+}
+
 function finishBootLoading() {
   if (assetsReady) return;
   assetsReady = true;
   document.documentElement.classList.remove('assets-pending');
   document.documentElement.classList.add('assets-ready');
-  const boot = document.getElementById('boot-loading');
-  if (boot) {
-    boot.classList.add('is-done');
-    boot.setAttribute('aria-busy', 'false');
-    window.setTimeout(() => { boot.hidden = true; }, 300);
-  }
+  hideBootOverlay();
   setStartButtonsEnabled(true);
   refreshMainMenu();
   if (document.getElementById('screen-char')?.classList.contains('active')) refreshCharScreen();
@@ -4791,7 +4823,12 @@ function noteAssetSettled() {
 }
 
 function trackImageAsset(a) {
+  if (!a) return;
   assetsPending += 1;
+  if (a.img) {
+    noteAssetSettled();
+    return;
+  }
   loadImageAsset(a, () => {
     noteAssetSettled();
     if (!assetsReady) {
@@ -4801,19 +4838,63 @@ function trackImageAsset(a) {
   });
 }
 
+function notifyGameplayReady() {
+  if (gameplayReady) return;
+  gameplayReady = true;
+  while (gameplayWaiters.length) {
+    const resolve = gameplayWaiters.shift();
+    try { resolve(); } catch (_) { /* ignore */ }
+  }
+}
+
+function whenGameplayReady() {
+  if (gameplayReady) return Promise.resolve();
+  return new Promise((resolve) => gameplayWaiters.push(resolve));
+}
+
+/** 局内资源清单：出战角色优先，世界物次之，另一角色垫后 */
+function listGameplayAssets() {
+  const primary = selectedChar === 'warrior' ? 'warrior' : 'mage';
+  const secondary = primary === 'mage' ? 'warrior' : 'mage';
+  const list = [];
+  const addChar = (id) => {
+    for (const frame of Object.values(CHAR_SPRITES[id] || {})) list.push(frame);
+    list.push(CHAR_RUN_SHEETS[id], CHAR_ROLL_SHEETS[id]);
+  };
+  addChar(primary);
+  for (const frame of Object.values(WORLD_ASSETS)) list.push(frame);
+  addChar(secondary);
+  return list.filter(Boolean);
+}
+
+function prefetchGameplayAssets() {
+  const list = listGameplayAssets().filter((a) => a && !a.img);
+  gameplayPending = list.length;
+  gameplayFinished = 0;
+  if (gameplayPending === 0) {
+    notifyGameplayReady();
+    return;
+  }
+  for (const a of list) {
+    loadImageAsset(a, () => {
+      gameplayFinished += 1;
+      if (gameplayFinished >= gameplayPending) notifyGameplayReady();
+    });
+  }
+}
+
+/** 首启只等立绘：菜单可进；局内贴图后台预取 */
 function loadPortraitAssets() {
   setStartButtonsEnabled(false);
   assetsPending = 0;
   assetsFinished = 0;
+  gameplayReady = false;
   loadSpriteManifest().finally(() => {
-    for (const id of ['mage', 'warrior']) {
-      trackImageAsset(PORTRAIT_ASSETS[id]);
-      for (const frame of Object.values(CHAR_SPRITES[id])) trackImageAsset(frame);
-      trackImageAsset(CHAR_RUN_SHEETS[id]);
-      trackImageAsset(CHAR_ROLL_SHEETS[id]);
-    }
-    for (const frame of Object.values(WORLD_ASSETS)) trackImageAsset(frame);
+    assetsPending = 0;
+    assetsFinished = 0;
+    for (const id of ['mage', 'warrior']) trackImageAsset(PORTRAIT_ASSETS[id]);
     if (assetsPending === 0) finishBootLoading();
+    prefetchGameplayAssets();
   });
 }
 
@@ -4918,64 +4999,41 @@ function pickCharSprite(charId) {
   return pickRunSheet(charId);
 }
 
-/** 跑步表：测脚锚后整表统一脚心 + 固定画宽（盖住最宽帧，消左右抖且不裁身体）。 */
+/** 跑步脚锚：只用配置/manifest 预计算值，禁止运行时 getImageData（手机首帧会卡死）。 */
 function ensureRunFootAnchors(sheet) {
-  if (sheet._runFootReady || !sheet.img?.width || !sheet.frames?.length) return;
-  const img = sheet.img;
-  const c = document.createElement('canvas');
-  c.width = img.width;
-  c.height = img.height;
-  const g = c.getContext('2d', { willReadFrequently: true });
-  if (!g) { sheet._runFootReady = true; return; }
-  g.drawImage(img, 0, 0);
-  const { data } = g.getImageData(0, 0, img.width, img.height);
-  const iw = img.width;
-  const refH = Math.max(1, sheet.refH || 214);
-
-  const locals = [];
-  for (const frame of sheet.frames) {
-    const cellX = frame.cellX ?? 0;
-    const cellY = frame.cellY ?? 0;
-    const cellW = frame.cellW || 0;
-    const cellH = frame.cellH || 0;
-    const footGap = Number.isFinite(frame.footGap) ? frame.footGap : 14;
-    const footAbsY = Number.isFinite(frame.bottom)
-      ? frame.bottom
-      : (cellH > 0 ? cellY + cellH - footGap - 1 : (frame.top || 0) + (frame.h || refH) - 1);
-
-    // 只采最底 3px 不透明中位，减少迈步腿扫底带带来的脚心漂移
-    const l = Number.isFinite(frame.left) ? frame.left : cellX;
-    const r = l + Math.max(1, frame.w || cellW || 1) - 1;
-    const y0 = Math.max(cellY, footAbsY - 2);
-    const y1 = Math.min(footAbsY, (cellH > 0 ? cellY + cellH : img.height) - 1);
-    let sum = 0;
-    let n = 0;
-    for (let y = y0; y <= y1; y++) {
-      const row = y * iw * 4;
-      for (let x = l; x <= r; x++) {
-        if (data[row + x * 4 + 3] > 20) { sum += x; n++; }
+  if (sheet._runFootReady || !sheet.frames?.length) return;
+  let footLocal = Number(sheet.runFootLocalX);
+  let lockW = Number(sheet.runLockW);
+  if (!Number.isFinite(footLocal) || !Number.isFinite(lockW) || lockW < 8) {
+    const locals = [];
+    let maxHalf = 0;
+    for (const frame of sheet.frames) {
+      const cellX = frame.cellX ?? 0;
+      const foot = Number.isFinite(frame.left) && Number.isFinite(frame.right)
+        ? (frame.left + frame.right) * 0.5
+        : cellX + (frame.cellW || frame.w || 0) * 0.5;
+      locals.push(foot - cellX);
+    }
+    locals.sort((a, b) => a - b);
+    footLocal = locals[locals.length >> 1] || 256;
+    for (const frame of sheet.frames) {
+      const cellX = frame.cellX ?? 0;
+      const foot = cellX + footLocal;
+      if (Number.isFinite(frame.left) && Number.isFinite(frame.right)) {
+        maxHalf = Math.max(maxHalf, foot - frame.left, frame.right - foot);
+      } else if (frame.w > 0) {
+        maxHalf = Math.max(maxHalf, frame.w * 0.5);
       }
     }
-    const rawFoot = n > 0 ? sum / n : (l + r) * 0.5;
-    frame._rawFootAbsX = rawFoot;
-    locals.push(rawFoot - cellX);
+    lockW = Math.max(8, Math.ceil(maxHalf * 2) + 2);
+    sheet.runFootLocalX = footLocal;
+    sheet.runLockW = lockW;
   }
-
-  locals.sort((a, b) => a - b);
-  const footLocal = locals[locals.length >> 1];
-  let maxHalf = 0;
   for (const frame of sheet.frames) {
-    const cellX = frame.cellX ?? 0;
-    const foot = cellX + footLocal;
-    frame.footAbsX = foot;
-    if (Number.isFinite(frame.left) && Number.isFinite(frame.right)) {
-      maxHalf = Math.max(maxHalf, foot - frame.left, frame.right - foot);
-    } else if (frame.w > 0) {
-      maxHalf = Math.max(maxHalf, frame.w * 0.5);
-    }
+    frame.footAbsX = (frame.cellX ?? 0) + footLocal;
   }
   sheet.runFootLocalX = footLocal;
-  sheet.runLockW = Math.max(8, Math.ceil(maxHalf * 2) + 2);
+  sheet.runLockW = lockW;
   sheet._runFootReady = true;
 }
 

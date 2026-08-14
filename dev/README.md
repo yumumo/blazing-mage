@@ -2,7 +2,8 @@
 
 局内真源只在 `www/castle-parkour/assets/`。`dev/art-raw/` 为中间态（**gitignore，不入库**）。
 
-口径：主仓 skill **`castle-parkour-art`** · 规则 `.cursor/rules/castle-parkour-art.mdc`。
+口径：主仓 skill **`castle-parkour-art`** · 规则 `.cursor/rules/castle-parkour-art.mdc`。  
+**局内用哪些 PNG**：[`www/castle-parkour/ASSETS.md`](../www/castle-parkour/ASSETS.md)。
 
 ## 分区
 

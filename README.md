@@ -37,3 +37,7 @@
 ## 技术说明
 
 本仓库为可独立发布的静态页游戏（Cloudflare Pages 产物为 `www/castle-parkour/`）。目录分区：`index.html` 壳 + `css/` + `js/`（`config/` 为角色/世界扩展点）+ `assets/`。若嵌在 XRK-AGT 中，挂载路径为 `/castle-parkour`。
+
+**局内用哪些 PNG**：见 [www/castle-parkour/ASSETS.md](www/castle-parkour/ASSETS.md)（立绘 / run-sheet / roll-sheet / 世界物；勿用 `*-run0.png` 散帧）。
+
+首启只加载立绘进菜单，局内贴图后台预取；点开始若未齐会短暂显示「准备关卡…」。改资源后 bump `ASSET_VER` 并同步 `index.html` 的 `?v=`。

@@ -6,7 +6,7 @@
  * 2. Drop PNGs into assets/ and refresh sprite-manifest.json
  * 3. Wire unlock/shop UI in game.js if needed
  */
-export const ASSET_VER = '20260816k';
+export const ASSET_VER = '20260816n';
 
 export const CHAR_NAMES = { mage: '法师', warrior: '战士' };
 
@@ -35,13 +35,22 @@ export const CHAR_SPRITES = {
   },
 };
 
-/** 1xN run strip（法师 7 / 战士 8；manifest.frames 优先） */
+/**
+ * 局内跑步真源：仅 *-run-sheet.png（1×N，512×768 格）。
+ * runFootLocalX / runLockW 由 manifest content 预计算，运行时禁止 getImageData。
+ */
 export const CHAR_RUN_SHEETS = {
-  mage: { src: 'assets/mage-run-sheet.png', img: null, ready: false, frames: null, refH: 296, cols: 8, rows: 1 },
-  warrior: { src: 'assets/warrior-run-sheet.png', img: null, ready: false, frames: null, refH: 296, cols: 8, rows: 1 },
+  mage: {
+    src: 'assets/mage-run-sheet.png', img: null, ready: false, frames: null,
+    refH: 296, cols: 8, rows: 1, runFootLocalX: 256, runLockW: 205,
+  },
+  warrior: {
+    src: 'assets/warrior-run-sheet.png', img: null, ready: false, frames: null,
+    refH: 296, cols: 8, rows: 1, runFootLocalX: 256, runLockW: 239,
+  },
 };
 
-/** 1xN roll strip（首尾跑步参考；播放跳过首尾） */
+/** 局内翻滚真源：*-roll-sheet.png（首尾为跑步尺，播放跳过） */
 export const CHAR_ROLL_SHEETS = {
   mage: { src: 'assets/mage-roll-sheet.png', img: null, ready: false, frames: null, refH: 296, cols: 11, rows: 1 },
   warrior: { src: 'assets/warrior-roll-sheet.png', img: null, ready: false, frames: null, refH: 296, cols: 11, rows: 1 },
