@@ -1,14 +1,14 @@
-# HTML / 版本探针：必须可拿到新版本，否则手机端会卡旧包
+# HTML：可协商缓存（304），有更新再换；勿永久 no-store
 /index.html
-  Cache-Control: no-cache, no-store, must-revalidate
+  Cache-Control: max-age=0, must-revalidate
 
 /build-id.txt
-  Cache-Control: no-store, max-age=0
+  Cache-Control: max-age=0, must-revalidate
 
 /
-  Cache-Control: no-cache
+  Cache-Control: max-age=0, must-revalidate
 
-# 带 ?v= 的静态资源可由浏览器长缓存
+# 带 ?v= 的静态资源长缓存；版本号不变则直接命中，无需强刷
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
