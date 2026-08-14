@@ -41,7 +41,9 @@ export const BAT_EXTRA_VX = 12;
 
 export const ROLL_DUR = 0.55;
 export const ROLL_SPEED_BOOST = 200;
-export const ROLL_CD = 0.15;
+export const ROLL_CD = 0.12;
+/** 翻滚碰撞相对当前帧显示尺寸的比例（略小于贴图，忽略尾气外扩） */
+export const ROLL_HIT_FROM_DRAW = 0.9;
 export const FAST_FALL_V = 1200;
 
 export const COIN_R = 14;
@@ -64,9 +66,16 @@ export const GAP_W_LATE_MAX = 150;
 
 export const LAYER_H = U;
 export const LAYER2_TOP = 2 * LAYER_H;
-export const PLATFORM_H = LAYER2_TOP;
-export const PLATFORM_W_MIN = 100;
-export const PLATFORM_W_MAX = 180;
+/** 二级台脚底离地高（与 LAYER2_TOP 同） */
+export const PLATFORM_H = 80;
+/** 三级台脚底离地高 */
+export const PLATFORM_H3 = 120;
+/** 二级台长：局内宽一半（VIEW.W=800） */
+export const PLATFORM_W_HALF = 400;
+/** 二级台长 / 三级台长：局内宽三分之一 */
+export const PLATFORM_W_THIRD = 267;
+/** 半长二级台末六分之一，三级台叠在这段起点上 */
+export const PLATFORM_L2_TAIL = 67;
 
 export const SPIKE_H = 0.75 * U;
 export const SPIKE_W = 52;

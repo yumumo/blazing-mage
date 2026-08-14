@@ -6,7 +6,7 @@
  * 2. Drop PNGs into assets/ and refresh sprite-manifest.json
  * 3. Wire unlock/shop UI in game.js if needed
  */
-export const ASSET_VER = '20260813z';
+export const ASSET_VER = '20260816k';
 
 export const CHAR_NAMES = { mage: '法师', warrior: '战士' };
 
@@ -15,12 +15,13 @@ export const PORTRAIT_ASSETS = {
   warrior: { src: 'assets/warrior-portrait.png', img: null, ready: false },
 };
 
-/** In-run poses: jump-ant -> jump -> fly; atk-wind -> atk */
+/** In-run poses: jump-ant → jump → fly → land; atk-wind → atk（两角色招式可不同） */
 export const CHAR_SPRITES = {
   mage: {
     jumpAnt: { src: 'assets/mage-jump-ant.png', img: null, ready: false },
     jump: { src: 'assets/mage-jump.png', img: null, ready: false },
     fly: { src: 'assets/mage-fly.png', img: null, ready: false },
+    jumpLand: { src: 'assets/mage-jump-land.png', img: null, ready: false },
     atkWind: { src: 'assets/mage-atk-wind.png', img: null, ready: false },
     atk: { src: 'assets/mage-atk.png', img: null, ready: false },
   },
@@ -28,21 +29,22 @@ export const CHAR_SPRITES = {
     jumpAnt: { src: 'assets/warrior-jump-ant.png', img: null, ready: false },
     jump: { src: 'assets/warrior-jump.png', img: null, ready: false },
     fly: { src: 'assets/warrior-fly.png', img: null, ready: false },
+    jumpLand: { src: 'assets/warrior-jump-land.png', img: null, ready: false },
     atkWind: { src: 'assets/warrior-atk-wind.png', img: null, ready: false },
     atk: { src: 'assets/warrior-atk.png', img: null, ready: false },
   },
 };
 
-/** 3x3 run sheet (preferred over loose run1..n) */
+/** 1xN run strip（法师 7 / 战士 8；manifest.frames 优先） */
 export const CHAR_RUN_SHEETS = {
-  mage: { src: 'assets/mage-run-sheet.png', img: null, ready: false, frames: null, refH: 275, cols: 3, rows: 3 },
-  warrior: { src: 'assets/warrior-run-sheet.png', img: null, ready: false, frames: null, refH: 277, cols: 3, rows: 3 },
+  mage: { src: 'assets/mage-run-sheet.png', img: null, ready: false, frames: null, refH: 296, cols: 8, rows: 1 },
+  warrior: { src: 'assets/warrior-run-sheet.png', img: null, ready: false, frames: null, refH: 296, cols: 8, rows: 1 },
 };
 
-/** 1x3 roll strip */
+/** 1xN roll strip（首尾跑步参考；播放跳过首尾） */
 export const CHAR_ROLL_SHEETS = {
-  mage: { src: 'assets/mage-roll-sheet.png', img: null, ready: false, frames: null, refH: 285, cols: 3, rows: 1 },
-  warrior: { src: 'assets/warrior-roll-sheet.png', img: null, ready: false, frames: null, refH: 232, cols: 3, rows: 1 },
+  mage: { src: 'assets/mage-roll-sheet.png', img: null, ready: false, frames: null, refH: 296, cols: 11, rows: 1 },
+  warrior: { src: 'assets/warrior-roll-sheet.png', img: null, ready: false, frames: null, refH: 296, cols: 11, rows: 1 },
 };
 
 /** Optional runtime registration for mods / future hooks */
