@@ -4699,26 +4699,10 @@ function loadImageAsset(a, onReady) {
   img.onload = finishOk;
   img.onerror = finishErr;
   a.img = img;
-  const resolved = resolveAssetUrl(a.src || '');
-  // 跨域镜像需 anonymous，否则 canvas 读像素会污染
-  if (/^https?:\/\//i.test(resolved)) img.crossOrigin = 'anonymous';
-  img.src = resolved + (resolved.includes('?') ? '&' : '?') + 'v=' + ASSET_VER;
+  const src = a.src || '';
+  img.src = src + (src.includes('?') ? '&' : '?') + 'v=' + ASSET_VER;
   // 仅缓存命中且已有像素时同步完成；宽高为 0 的 complete 必须等 onload
   if (img.complete && (img.naturalWidth || img.width) > 0) finishOk();
-}
-
-/** 国内镜像根（boot-mobile 探针写入）；本地 / AGT 为空字符串 */
-function assetBase() {
-  const b = window.__CP_ASSET_BASE;
-  return typeof b === 'string' ? b : '';
-}
-
-function resolveAssetUrl(src) {
-  if (!src) return src;
-  if (/^https?:\/\//i.test(src) || src.startsWith('data:')) return src;
-  const base = assetBase();
-  if (!base) return src;
-  return base + String(src).replace(/^\.\//, '');
 }
 
 /** 美术尺寸真源：assets/sprite-manifest.json（生图后必须 measure 更新） */
@@ -4795,8 +4779,7 @@ function ensureSpriteMeta(asset) {
 }
 
 function loadSpriteManifest() {
-  const url = resolveAssetUrl('assets/sprite-manifest.json') + '?v=' + ASSET_VER;
-  return fetch(url, { mode: assetBase() ? 'cors' : 'same-origin', cache: 'force-cache' })
+  return fetch('assets/sprite-manifest.json?v=' + ASSET_VER)
     .then((r) => (r.ok ? r.json() : null))
     .then((data) => {
       if (!data?.sprites) return;

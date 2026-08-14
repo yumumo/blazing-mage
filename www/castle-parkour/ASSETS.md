@@ -20,14 +20,14 @@
 - `index.html` 里 `boot-mobile.js` / `app.css` / `main.js` 的 `?v=`
 - `boot-mobile.js` 的 `EMBEDDED_BUILD`
 
-发版后比对 `build-id.txt`；**仅版本变化**才清缓存硬刷。国内镜像见根 `README.md`（须先 push GitHub）。
+发版后比对 `build-id.txt`；**仅版本变化**才清缓存硬刷。资源一律同源（Pages / 本地 / AGT），无第三方镜像。
 
 ## 代码分层
 
 | 文件 | 职责 |
 |------|------|
-| `js/boot-mobile.js` | 双端 UI class、版本探针、国内镜像竞速 → `__CP_ASSET_BASE` |
-| `js/main.js` | 等 `__CP_BOOT` 后动态加载 `game.js` |
+| `js/boot-mobile.js` | 双端 UI class、版本探针（无更新不清缓存） |
+| `js/main.js` | 入口，加载 `game.js` |
 | `js/config/characters.js` | 角色登记 + `ASSET_VER` |
 | `js/config/world.js` | 世界物登记 |
 | `js/config/gameplay.js` | 可调数值（平台尺寸 `PLATFORM_*` 等） |
