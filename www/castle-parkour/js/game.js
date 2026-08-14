@@ -4823,19 +4823,36 @@ function hideBootOverlay() {
   window.setTimeout(() => { boot.hidden = true; }, 280);
 }
 
-function showBootOverlay(text) {
+function updateBootProgress(done, total, label) {
+  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+  const pctEl = document.getElementById('boot-pct');
+  if (pctEl) pctEl.textContent = pct + '%';
+  const fill = document.getElementById('boot-bar-fill');
+  if (fill) fill.style.width = pct + '%';
+  const bootText = document.querySelector('.boot-loading-text');
+  if (bootText) bootText.textContent = (label || '加载中…') + ' ' + pct + '%';
+  const boot = document.getElementById('boot-loading');
+  if (boot) boot.setAttribute('aria-valuenow', String(pct));
+}
+
+function showBootOverlay(text, done, total) {
   const boot = document.getElementById('boot-loading');
   if (!boot) return;
   boot.hidden = false;
   boot.classList.remove('is-done');
   boot.setAttribute('aria-busy', 'true');
-  const bootText = document.querySelector('.boot-loading-text');
-  if (bootText && text) bootText.textContent = text;
+  if (Number.isFinite(done) && Number.isFinite(total)) {
+    updateBootProgress(done, total, text || '准备中…');
+  } else {
+    const bootText = document.querySelector('.boot-loading-text');
+    if (bootText && text) bootText.textContent = text;
+  }
 }
 
 function finishBootLoading() {
   if (assetsReady) return;
   assetsReady = true;
+  updateBootProgress(1, 1, '完成');
   document.documentElement.classList.remove('assets-pending');
   document.documentElement.classList.add('assets-ready');
   hideBootOverlay();
@@ -4846,27 +4863,23 @@ function finishBootLoading() {
 
 function noteAssetSettled() {
   assetsFinished += 1;
-  const bootText = document.querySelector('.boot-loading-text');
-  if (bootText && assetsPending > 0) {
-    const pct = Math.min(100, Math.round((assetsFinished / assetsPending) * 100));
-    bootText.textContent = '加载中… ' + pct + '%';
+  updateBootProgress(assetsFinished, assetsPending, '加载中…');
+  if (assetsPending > 0 && assetsFinished >= assetsPending) {
+    tryNotifyGameplayReady();
+    finishBootLoading();
+    scheduleDeferredAssets();
   }
-  if (assetsFinished >= assetsPending) finishBootLoading();
 }
 
 function trackImageAsset(a) {
   if (!a) return;
   assetsPending += 1;
-  if (a.img) {
+  if (a.ready && a.img?.width > 0) {
     noteAssetSettled();
     return;
   }
   loadImageAsset(a, () => {
     noteAssetSettled();
-    if (!assetsReady) {
-      refreshMainMenu();
-      if (document.getElementById('screen-char')?.classList.contains('active')) refreshCharScreen();
-    }
   });
 }
 
@@ -4944,28 +4957,31 @@ function scheduleDeferredAssets() {
 }
 
 function prefetchGameplayAssets() {
-  const critical = listCriticalGameplayAssets();
-  let left = loadAssetList(critical, () => {
-    tryNotifyGameplayReady();
-    left -= 1;
-    if (left <= 0) scheduleDeferredAssets();
-  });
-  tryNotifyGameplayReady();
-  if (left === 0) scheduleDeferredAssets();
+  // 进度已并入 loadPortraitAssets（立绘 + 开跑必需）
 }
 
-/** 首启只等立绘：菜单可进；局内贴图后台预取 */
+/** 首启：立绘 + 出战角色开跑资源计入同一进度条，到 100% 再进菜单 */
 function loadPortraitAssets() {
   setStartButtonsEnabled(false);
   assetsPending = 0;
   assetsFinished = 0;
   gameplayReady = false;
+  updateBootProgress(0, 1, '准备中…');
   loadSpriteManifest().finally(() => {
     assetsPending = 0;
     assetsFinished = 0;
-    for (const id of ['mage', 'warrior']) trackImageAsset(PORTRAIT_ASSETS[id]);
-    if (assetsPending === 0) finishBootLoading();
-    prefetchGameplayAssets();
+    const queue = [
+      PORTRAIT_ASSETS.mage,
+      PORTRAIT_ASSETS.warrior,
+      ...listCriticalGameplayAssets(),
+    ];
+    updateBootProgress(0, Math.max(1, queue.length), '加载中…');
+    for (const a of queue) trackImageAsset(a);
+    if (assetsPending === 0) {
+      tryNotifyGameplayReady();
+      finishBootLoading();
+      scheduleDeferredAssets();
+    }
   });
 }
 

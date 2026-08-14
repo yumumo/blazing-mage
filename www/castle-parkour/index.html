@@ -5,13 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="color-scheme" content="dark" />
   <title>古堡跑酷</title>
-  <script src="js/boot-mobile.js?v=20260816r"></script>
-  <link rel="stylesheet" href="css/app.css?v=20260816r" />
+  <script src="js/boot-mobile.js?v=20260816s"></script>
+  <link rel="stylesheet" href="css/app.css?v=20260816s" />
 </head>
 <body>
-  <div id="boot-loading" class="boot-loading" aria-live="polite" aria-busy="true">
+  <div id="boot-loading" class="boot-loading" aria-live="polite" aria-busy="true" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
     <div class="boot-spinner" aria-hidden="true"></div>
-    <p class="boot-loading-text">加载中…</p>
+    <p class="boot-loading-pct" id="boot-pct">0%</p>
+    <div class="boot-bar" aria-hidden="true"><i id="boot-bar-fill"></i></div>
+    <p class="boot-loading-text">加载中… 0%</p>
   </div>
 
   <div class="deco d-circle"></div>
@@ -178,6 +180,6 @@
     </div>
 
   </div>
-  <script type="module" src="js/main.js?v=20260816r"></script>
+  <script type="module" src="js/main.js?v=20260816s"></script>
 </body>
 </html>

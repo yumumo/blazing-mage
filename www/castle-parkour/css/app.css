@@ -35,6 +35,30 @@
   letter-spacing: 0.06em;
   color: rgba(250, 246, 236, 0.72);
 }
+.boot-loading-pct {
+  margin: 0;
+  text-align: center;
+  font: 800 42px/1 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  letter-spacing: 0.04em;
+  color: #f0d080;
+  font-variant-numeric: tabular-nums;
+}
+.boot-bar {
+  width: min(220px, 56vw);
+  height: 6px;
+  margin: 0 auto;
+  border-radius: 99px;
+  background: rgba(250, 246, 236, 0.12);
+  overflow: hidden;
+}
+.boot-bar > i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #c4a468, #f0d080);
+  transition: width 0.18s ease-out;
+}
 @keyframes boot-spin {
   to { transform: rotate(360deg); }
 }
