@@ -9,6 +9,8 @@
 
 发版后玩家下次打开会比对 `build-id.txt`；若与本地不同则清 Cache Storage / SW 并自动重载一次。
 
+国内访问：优先打开 README 里的 **jsdmirror / jsDelivr** 链接；`pages.dev` 首启会竞速，过慢会跳到镜像。资源根写在 `window.__CP_ASSET_BASE`（`boot-mobile.js`）。镜像内容来自 GitHub `main`，**须先 push** 才有新图。
+
 ## 加载策略
 
 | 阶段 | 等什么 | 用户看到 |

@@ -2,7 +2,15 @@
 
 月夜城墙上的横版跑酷。沿着外墙石道一路向前，跳跃、翻滚、开火，躲开亡灵与机关，收集金币强化角色——冲得越远，城墙上的危机越密。
 
-**在线游玩**：[https://castle-parkour.pages.dev/](https://castle-parkour.pages.dev/)
+**在线游玩**
+
+| 线路 | 链接 | 说明 |
+|------|------|------|
+| 国内推荐 | [jsDelivr 镜像](https://cdn.jsdmirror.com/gh/yumumo/castle-parkour@main/www/castle-parkour/) | 不走 Cloudflare，国内一般可直连 |
+| 备用 | [cdn.jsdelivr.net](https://cdn.jsdelivr.net/gh/yumumo/castle-parkour@main/www/castle-parkour/) | 官方 jsDelivr |
+| 国际 | [Cloudflare Pages](https://castle-parkour.pages.dev/) | 国内常需代理；打开后会自动竞速，慢则跳镜像 |
+
+本地 / XRK-AGT 挂载仍走同源，不强制镜像。强制镜像加 `?cdn=1`，强制同源加 `?cdn=0`。
 
 ## 设定
 
