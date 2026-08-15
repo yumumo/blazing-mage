@@ -1,8 +1,8 @@
 (() => {
   const BUILD_KEY = 'cp-build-id';
   const RELOAD_KEY = 'cp-build-reloading';
-  /** ? build-id.txt / ASSET_VER ?? */
-  const EMBEDDED_BUILD = '20260819d';
+  /** 与 build-id.txt / ASSET_VER 同步 */
+  const EMBEDDED_BUILD = '20260819s';
 
   const detectMobileUi = () => {
     if (navigator.userAgentData?.mobile === true) return true;
@@ -15,6 +15,17 @@
     return Boolean(narrow && (coarse || navigator.maxTouchPoints > 0));
   };
 
+  /** 去掉地址栏里的 _v（旧破缓存参数），不刷新页面 */
+  const stripVersionQuery = () => {
+    try {
+      const url = new URL(location.href);
+      if (!url.searchParams.has('_v')) return;
+      url.searchParams.delete('_v');
+      const q = url.searchParams.toString();
+      history.replaceState(null, '', url.pathname + (q ? `?${q}` : '') + url.hash);
+    } catch (_) { /* ignore */ }
+  };
+
   const setupUi = () => {
     const mobileUi = detectMobileUi();
     window.__DEMO_DETECT_MOBILE_UI = detectMobileUi;
@@ -24,7 +35,6 @@
     document.documentElement.classList.add('assets-pending');
   };
 
-  /** ???????????????????? */
   const clearSiteCaches = async () => {
     try {
       if (navigator.serviceWorker?.getRegistrations) {
@@ -49,13 +59,16 @@
     sessionStorage.setItem(RELOAD_KEY, buildId);
     localStorage.setItem(BUILD_KEY, buildId);
     await clearSiteCaches();
+    // 清缓存后直接回干净地址，不再把版本号写进 URL
     const url = new URL(location.href);
-    url.searchParams.set('_v', buildId);
-    location.replace(url.pathname + url.search + url.hash);
+    url.searchParams.delete('_v');
+    const q = url.searchParams.toString();
+    location.replace(url.pathname + (q ? `?${q}` : '') + url.hash);
     return true;
   };
 
   setupUi();
+  stripVersionQuery();
   window.__CP_BOOT = Promise.resolve();
   window.__CP_ASSET_BASE = '';
 

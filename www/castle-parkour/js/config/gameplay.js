@@ -65,14 +65,16 @@ export const PX_PER_METER = 26;
 export const KILL_GOLD = 10;
 export const METER_PER_GOLD = 5;
 
-export const GAP_W_MIN = 62;
-export const GAP_W_MAX = 92;
-export const GAP_COOLDOWN = 5;
+export const GAP_W_MIN = 58;
+export const GAP_W_MAX = 86;
+export const GAP_COOLDOWN = 6;
 export const OBSTACLE_MARGIN = 70;
-export const POST_GAP_SAFE = 280;
-export const GAP_DEPTH = 160;
-export const GAP_W_LATE_MIN = 110;
-export const GAP_W_LATE_MAX = 150;
+export const POST_GAP_SAFE = 360;
+export const GAP_DEPTH = 240;
+/** 掉入坑后离地超过此深度才触发掉坑结算（越大=空中操作窗口越大） */
+export const GAP_FALL_KILL = 90;
+export const GAP_W_LATE_MIN = 100;
+export const GAP_W_LATE_MAX = 140;
 
 export const LAYER_H = U;
 export const LAYER2_TOP = 2 * LAYER_H;
@@ -110,6 +112,11 @@ export const PORTAL_HIT_R = Math.round(PORTAL_DRAW_H * 0.42);
 export const PORTAL_SUCK_DUR = 0.55;
 /** 角色中心进入旋涡水平范围即触发吸入 */
 export const PORTAL_SUCK_X = Math.round(PORTAL_DRAW_H * 0.28);
+/** 下一次奖励门距离区间（米）：更稳、更可读 */
+export const PORTAL_DIST_MIN = 900;
+export const PORTAL_DIST_MAX = 1300;
+/** 开局首次奖励门（米） */
+export const PORTAL_FIRST_DIST = 700;
 
 export const SKY_SPRINT_DUR = 3.0;
 export const SKY_SPRINT_FADE = 0.5;
@@ -123,5 +130,5 @@ export const ENERGY_REGEN = 30;
 export const TUTORIAL_END = 420;
 export const TUTORIAL_LEAD_PX = 240;
 
-/** UI / canvas type */
-export const CASTLE_FONT = '"Noto Sans SC","Segoe UI","PingFang SC","Microsoft YaHei",sans-serif';
+/** UI / canvas HUD · Castle Type */
+export const CASTLE_FONT = '"Segoe UI","DIN Alternate","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif';

@@ -61,6 +61,7 @@ import {
   OBSTACLE_MARGIN,
   POST_GAP_SAFE,
   GAP_DEPTH,
+  GAP_FALL_KILL,
   GAP_W_LATE_MIN,
   GAP_W_LATE_MAX,
   PLATFORM_H,
@@ -82,6 +83,9 @@ import {
   PORTAL_HIT_R,
   PORTAL_SUCK_DUR,
   PORTAL_SUCK_X,
+  PORTAL_DIST_MIN,
+  PORTAL_DIST_MAX,
+  PORTAL_FIRST_DIST,
   SKY_SPRINT_DUR,
   SKY_SPRINT_FADE,
   SKY_SPRINT_H,
@@ -138,46 +142,95 @@ function setSfxVolume(v) {
   localStorage.setItem('castle-parkour-vol-sfx', String(v));
 }
 
-// BGM：古堡夜奔——小调琶音 + 低音鼓点感
-const BGM_MELODY = [147, 175, 196, 233, 220, 196, 175, 156, 147, 175, 208, 233, 262, 233, 196, 175];
-const BGM_BASS = [73, 73, 65, 65, 78, 78, 87, 87, 73, 65, 78, 87, 98, 87, 78, 73];
+// BGM：古堡夜奔——低沉小调进行曲 + 管风琴感和声 + 稀疏鼓点感
+// 音高约 A2–D4，偏暗、可循环
+const BGM_MELODY = [
+  110, 130.8, 146.8, 164.8, 174.6, 164.8, 146.8, 130.8,
+  116.5, 130.8, 146.8, 174.6, 196.0, 174.6, 146.8, 130.8,
+  110, 123.5, 146.8, 185.0, 174.6, 146.8, 138.6, 123.5,
+  110, 130.8, 164.8, 196.0, 220.0, 196.0, 164.8, 130.8,
+];
+const BGM_BASS = [
+  55, 55, 65.4, 65.4, 73.4, 73.4, 82.4, 82.4,
+  55, 61.7, 73.4, 87.3, 98.0, 87.3, 73.4, 65.4,
+];
+const BGM_STEP_MS = 360;
 let bgmIdx = 0;
 
 function playBgmNote() {
   if (!audioCtx || muted) { bgmTimer = null; return; }
   const t = audioCtx.currentTime;
+  const mel = BGM_MELODY[bgmIdx % BGM_MELODY.length];
+  const bar = bgmIdx % 8 === 0;
+
+  // 主旋律：偏软方波，像远处铜管
   const osc = audioCtx.createOscillator();
   const g = audioCtx.createGain();
   osc.type = 'triangle';
-  osc.frequency.value = BGM_MELODY[bgmIdx % BGM_MELODY.length];
+  osc.frequency.value = mel;
   g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(0.16, t + 0.04);
-  g.gain.exponentialRampToValueAtTime(0.01, t + 0.42);
+  g.gain.linearRampToValueAtTime(0.14, t + 0.05);
+  g.gain.exponentialRampToValueAtTime(0.01, t + 0.55);
   osc.connect(g); g.connect(bgmGain);
-  osc.start(t); osc.stop(t + 0.45);
-  // soft pad harmonic for castle mood
+  osc.start(t); osc.stop(t + 0.58);
+
+  // 五度叠音：古堡空灵感
+  const fifth = audioCtx.createOscillator();
+  const fg = audioCtx.createGain();
+  fifth.type = 'sine';
+  fifth.frequency.value = mel * 1.5;
+  fg.gain.setValueAtTime(0, t);
+  fg.gain.linearRampToValueAtTime(0.045, t + 0.06);
+  fg.gain.exponentialRampToValueAtTime(0.01, t + 0.62);
+  fifth.connect(fg); fg.connect(bgmGain);
+  fifth.start(t); fifth.stop(t + 0.65);
+
+  // 低八度垫音
   const pad = audioCtx.createOscillator();
   const pg = audioCtx.createGain();
   pad.type = 'sine';
-  pad.frequency.value = BGM_MELODY[bgmIdx % BGM_MELODY.length] * 0.5;
+  pad.frequency.value = mel * 0.5;
   pg.gain.setValueAtTime(0, t);
-  pg.gain.linearRampToValueAtTime(0.06, t + 0.05);
-  pg.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+  pg.gain.linearRampToValueAtTime(bar ? 0.08 : 0.05, t + 0.08);
+  pg.gain.exponentialRampToValueAtTime(0.01, t + 0.7);
   pad.connect(pg); pg.connect(bgmGain);
-  pad.start(t); pad.stop(t + 0.55);
+  pad.start(t); pad.stop(t + 0.72);
+
+  // 低音根音（隔拍）
   if (bgmIdx % 2 === 0) {
     const bosc = audioCtx.createOscillator();
     const bg = audioCtx.createGain();
     bosc.type = 'sine';
     bosc.frequency.value = BGM_BASS[(bgmIdx / 2) % BGM_BASS.length];
     bg.gain.setValueAtTime(0, t);
-    bg.gain.linearRampToValueAtTime(0.12, t + 0.03);
-    bg.gain.exponentialRampToValueAtTime(0.01, t + 0.6);
+    bg.gain.linearRampToValueAtTime(0.13, t + 0.04);
+    bg.gain.exponentialRampToValueAtTime(0.01, t + 0.75);
     bosc.connect(bg); bg.connect(bgmGain);
-    bosc.start(t); bosc.stop(t + 0.65);
+    bosc.start(t); bosc.stop(t + 0.8);
   }
+
+  // 小节头轻鼓感（噪声短脉冲）
+  if (bar) {
+    try {
+      const len = Math.floor(audioCtx.sampleRate * 0.05);
+      const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      const src = audioCtx.createBufferSource();
+      const ng = audioCtx.createGain();
+      const filt = audioCtx.createBiquadFilter();
+      filt.type = 'lowpass';
+      filt.frequency.value = 420;
+      src.buffer = buf;
+      ng.gain.setValueAtTime(0.05, t);
+      ng.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+      src.connect(filt); filt.connect(ng); ng.connect(bgmGain);
+      src.start(t); src.stop(t + 0.06);
+    } catch { /* ignore */ }
+  }
+
   bgmIdx++;
-  bgmTimer = setTimeout(playBgmNote, 320);
+  bgmTimer = setTimeout(playBgmNote, BGM_STEP_MS);
 }
 
 function startBGM() {
@@ -311,6 +364,7 @@ const WARRIOR_SHD_MIN = 1;
 const WARRIOR_ATK_MAX = 4;
 const WARRIOR_ATK_PWR_MAX = 5;
 const WARRIOR_ATK_PWR_MIN = 3;
+const WARRIOR_ST_MAX = 5;
 const TALENT_MAX = 5;
 const SHELTER_CD = [90, 80, 70, 60, 60];
 const SHELTER_FLY_DUR = 5.0;
@@ -321,7 +375,9 @@ const UP_COST_MAGE_EN = (lv) => lv * 60;
 const UP_COST_WARRIOR_HP = (hp) => (hp - WARRIOR_HP_MIN + 1) * 100;
 const UP_COST_WARRIOR_SHD = () => 180;
 const UP_COST_WARRIOR_ATK = (lv) => 110 + lv * 80;
+const UP_COST_WARRIOR_ST = (lv) => lv * 70;
 const energyRegen = () => ENERGY_REGEN * (1 + (charData.mage.en - 1) * 0.2);
+const staminaRegen = () => ENERGY_REGEN * (1 + charData.warrior.st * 0.1);
 const mageAtkPower = () => Math.min(MAGE_ATK_PWR_MAX, charData.mage.atk);
 const mageOrbitUnlocked = () => charData.mage.atk >= MAGE_ATK_MAX;
 const warriorAtkPower = () => Math.min(WARRIOR_ATK_PWR_MAX, WARRIOR_ATK_PWR_MIN + charData.warrior.atk - 1);
@@ -430,7 +486,7 @@ const save = (k, v) => localStorage.setItem(k, String(v));
 
 const CHAR_DEFAULTS = {
   mage: { hp: 1, atk: 1, shd: 0, en: 1 },
-  warrior: { unlocked: false, hp: WARRIOR_HP_MIN, shd: WARRIOR_SHD_MIN, atk: 1, talent: 0 },
+  warrior: { unlocked: false, hp: WARRIOR_HP_MIN, shd: WARRIOR_SHD_MIN, atk: 1, talent: 0, st: 1 },
 };
 
 function loadCharData() {
@@ -467,6 +523,7 @@ function loadCharData() {
   data.warrior.shd = Math.min(WARRIOR_SHD_MAX, Math.max(WARRIOR_SHD_MIN, data.warrior.shd));
   data.warrior.atk = Math.min(WARRIOR_ATK_MAX, Math.max(1, data.warrior.atk ?? 1));
   data.warrior.talent = Math.min(TALENT_MAX, Math.max(0, data.warrior.talent | 0));
+  data.warrior.st = Math.min(WARRIOR_ST_MAX, Math.max(1, data.warrior.st ?? 1));
   return data;
 }
 
@@ -506,6 +563,7 @@ const PU_R = 16;               // 道具拾取半径
 
 // ===================== 状态 =====================
 let running = false;
+let paused = false;
 let over = false;
 let worldX = 0;             // 世界累计位移（px）—— 计分唯一真源
 let px = 0;                 // 角色脚底离地高度
@@ -520,7 +578,7 @@ let attackFx = 0;
 let invincible = 0;
 let runTime = 0;
 let killCount = 0;
-let energy = ENERGY_MAX;     // 能量（子弹资源）
+let energy = ENERGY_MAX;     // 法师魔力 / 战士体力（攻击资源）
 let canDoubleJump = false;   // 二段跳可用
 let airJumpCount = 0;        // 0地面 / 1一段跳 / 2二段跳（动作衔接）
 let airAge = 0;              // 离地时长（动作衔接）
@@ -557,13 +615,20 @@ let skySprintDurActive = SKY_SPRINT_DUR;
 let bonusActive = false;       // 是否在奖励空间中
 let bonusDist = 0;             // 奖励空间已跑距离
 const BONUS_DIST_MAX = 300;    // 奖励空间长度 300m（缩短，控制金币总量）
-let nextPortalDist = 1500 + Math.random() * 1500; // 下次传送门距离
+let nextPortalDist = PORTAL_FIRST_DIST;
 let portal = null;             // 传送门实体 { x, y, phase }
 let portalSuck = null;         // 吸入中 { t, fromX, fromY, toX, toY }
+let portalSpawnTries = 0;      // 到达距离后连续尝试生成次数（避免永远刷不出）
 let bonusReturnDist = 0;       // 进入奖励空间前的世界距离
 let transitionFx = 0;          // 过渡特效计时
 let bonusFinaleSpawned = false; // 奖励空间收尾金币是否已生成
 
+function scheduleNextPortal(fromDist) {
+  const base = fromDist == null ? distanceM() : fromDist;
+  const span = PORTAL_DIST_MAX - PORTAL_DIST_MIN;
+  nextPortalDist = base + PORTAL_DIST_MIN + Math.random() * Math.max(1, span);
+  portalSpawnTries = 0;
+}
 // ===================== 道具状态 =====================
 let ownedItems = loadItems();                                        // 持久化库存
 let activeItems = { double: false, revive: false }; // 局内激活（磁铁走 itemTimers，护盾走 itemShield）
@@ -1022,12 +1087,24 @@ function spawnFeature(x0, x1, afterGap) {
     trySpawnBat(d);
   }
 
-  // ---- 传送门生成 ----
+  // ---- 传送门生成（到达距离后持续尝试；多次失败则清障强制刷）----
   if (!bonusActive && !portal && !portalSuck && distanceM() >= nextPortalDist) {
-    // 在当前段面生成传送门（仅旋涡，居中悬浮）
-    const px2 = x0 + OBSTACLE_MARGIN + Math.random() * Math.max(1, (x1 - x0) - 2 * OBSTACLE_MARGIN - 60);
-    if (isRangeFree(px2, Math.max(90, PORTAL_SUCK_X * 2), 40)) {
+    const needW = Math.max(90, PORTAL_SUCK_X * 2);
+    let px2 = x0 + OBSTACLE_MARGIN + Math.random() * Math.max(1, (x1 - x0) - 2 * OBSTACLE_MARGIN - 60);
+    portalSpawnTries++;
+    let ok = isRangeFree(px2, needW, 40);
+    if (!ok && portalSpawnTries >= 3) {
+      // 强制：清掉门附近障碍，保证可读地出现
+      const clearR = needW * 0.5 + 50;
+      clearAhead(px2 + clearR, { featureCd: 2, gapCd: 2 });
+      gaps = gaps.filter((g) => g.x + g.w < px2 - 40 || g.x > px2 + needW + 40);
+      walls = walls.filter((w) => w.x + w.w < px2 - 30 || w.x > px2 + needW + 30);
+      spikes = spikes.filter((s) => s.x + s.w < px2 - 30 || s.x > px2 + needW + 30);
+      ok = true;
+    }
+    if (ok) {
       portal = { x: px2, y: Math.round(GROUND * 0.52), phase: 0 };
+      portalSpawnTries = 0;
     }
   }
 }
@@ -1348,7 +1425,8 @@ function beginRun() {
   }
   // 奖励空间重置
   bonusActive = false; bonusDist = 0;
-  nextPortalDist = 1500 + Math.random() * 1500;
+  nextPortalDist = PORTAL_FIRST_DIST;
+  portalSpawnTries = 0;
   portal = null; portalSuck = null; transitionFx = 0; bonusReturnDist = 0;
   bonusFinaleSpawned = false;
   // 道具状态重置 + 从 ownedItems 装备选中的道具
@@ -1362,6 +1440,7 @@ function beginRun() {
   equippedItems = { magnet: false, shield: false, double: false, revive: false };
   refreshItemEquip();
   over = false;
+  paused = false;
   lastTs = performance.now();
   running = true;
   hudCache.m = hudCache.g = hudCache.s = -1;
@@ -1369,6 +1448,9 @@ function beginRun() {
   startBtn.textContent = '重新开始';
   startBtn.disabled = true;
   homeBtn.style.display = 'none';
+  const pauseBtn = document.getElementById('btn-pause');
+  if (pauseBtn) pauseBtn.style.display = '';
+  syncPauseUi();
   initAudio();
   startBGM();
   startFrameLoop();
@@ -1376,17 +1458,59 @@ function beginRun() {
 
 function backToMenu() {
   running = false;
+  paused = false;
+  syncPauseUi();
   document.getElementById('screen-game').classList.remove('is-playing');
   stopBGM();
   homeBtn.style.display = 'none';
   startBtn.textContent = '开始游戏';
   startBtn.disabled = !assetsReady;
+  const pauseBtn = document.getElementById('btn-pause');
+  if (pauseBtn) pauseBtn.style.display = 'none';
   // 退出全屏（横版布局在重新进入游戏画面时由 applyMobileLayout 重新应用）
   if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
   document.getElementById('screen-game').classList.remove('game-landscape');
   landscapeMode = false;
   landscapeBtn.textContent = isMobile() ? '全屏' : '横屏模式';
   show('screen-menu');
+}
+
+function syncPauseUi() {
+  const pauseBtn = document.getElementById('btn-pause');
+  if (!running || over) {
+    if (pauseBtn) pauseBtn.textContent = '暂停';
+    if (bgmGain) bgmGain.gain.value = bgmVolume * 0.15;
+    return;
+  }
+  if (paused) {
+    startBtn.textContent = '继续';
+    startBtn.disabled = false;
+    homeBtn.style.display = 'inline-block';
+    if (pauseBtn) pauseBtn.textContent = '继续';
+    if (bgmGain) bgmGain.gain.value = bgmVolume * 0.05;
+  } else {
+    startBtn.textContent = '重新开始';
+    startBtn.disabled = true;
+    homeBtn.style.display = 'none';
+    if (pauseBtn) pauseBtn.textContent = '暂停';
+    if (bgmGain) bgmGain.gain.value = bgmVolume * 0.15;
+  }
+}
+
+function setPaused(on) {
+  if (!running || over) return;
+  paused = !!on;
+  if (paused) {
+    keys.clear();
+    jumpPressed = false;
+    duckPressed = false;
+  }
+  syncPauseUi();
+}
+
+function togglePause() {
+  if (!running || over) return;
+  setPaused(!paused);
 }
 
 function gameOver() {
@@ -1410,6 +1534,8 @@ function gameOver() {
   }
   running = false;
   over = true;
+  paused = false;
+  syncPauseUi();
   document.getElementById('screen-game').classList.remove('is-playing');
   stopBGM();
   save(LS.plays, load(LS.plays, 0) + 1);
@@ -1598,7 +1724,10 @@ function meleeHitInRange(range) {
 function attack() {
   if (atkCd > 0) return;
   const atkBoost = puTimers.attack > 0;
+  const cost = atkBoost ? ENERGY_COST * 0.5 : ENERGY_COST;
+  if (energy < cost) return;
   if (isWarrior()) {
+    energy -= cost;
     attackFx = SWORD_SLASH_DUR;
     atkCd = atkBoost ? WARRIOR_ATTACK_CD * 0.7 : WARRIOR_ATTACK_CD;
     const range = SWORD_BASE_RANGE * (atkBoost ? 1.2 : 1);
@@ -1607,14 +1736,18 @@ function attack() {
     meleeHitInRange(range);
     sfxAttack();
   } else {
-    const cost = atkBoost ? ENERGY_COST * 0.5 : ENERGY_COST;
-    if (energy < cost || fireballs.length >= MAX_BULLETS) return;
+    if (fireballs.length >= MAX_BULLETS) return;
+    // 大火球：至少够一发基础耗能，出手后清空当前能量，体型/伤害按耗能量缩放
+    const spent = energy;
+    energy = 0;
     atkCd = atkBoost ? ATTACK_CD * 0.55 : ATTACK_CD;
-    energy -= cost;
     attackFx = MAGE_ATK_DUR;
     const fy = GROUND - px - U * (ducking ? 0.55 : 1.05);
-    const fbs = atkBoost ? FB_SPEED * 1.45 : FB_SPEED;
-    pendingMageShot = { delay: MAGE_ATK_FIRE_AT, fy, fbs };
+    const ratio = Math.min(1, spent / ENERGY_MAX);
+    const fbs = (atkBoost ? FB_SPEED * 1.45 : FB_SPEED) * (0.92 + ratio * 0.35);
+    const rScale = 1 + ratio * 1.8;
+    const dmg = Math.max(1, Math.round(mageAtkPower() * (spent / ENERGY_COST) * (atkBoost ? 1.25 : 1)));
+    pendingMageShot = { delay: MAGE_ATK_FIRE_AT, fy, fbs, rScale, dmg, spent };
     tryChargeOrbitOrb();
     sfxAttack();
   }
@@ -1633,6 +1766,8 @@ function releasePendingMageShot() {
   const tip = mageStaffTip();
   const fy = pendingMageShot.fy ?? tip.y;
   const fbs = pendingMageShot.fbs;
+  const rScale = pendingMageShot.rScale || 1;
+  const dmg = pendingMageShot.dmg ?? mageAtkPower();
   fireballs.push({
     x: tip.x,
     y: fy,
@@ -1641,8 +1776,11 @@ function releasePendingMageShot() {
     accel: fbs * 2.4,
     birth: 0.12,
     life: 2.2,
+    rScale,
+    dmg,
+    big: rScale > 1.35,
   });
-  mageMuzzleFx = 0.12;
+  mageMuzzleFx = 0.12 * Math.min(1.6, rScale);
   pendingMageShot = null;
 }
 
@@ -1787,8 +1925,9 @@ function update(dt) {
   // 过渡特效计时
   if (transitionFx > 0) transitionFx = Math.max(0, transitionFx - dt * 2.5);
 
-  // 能量回复（仅法师）
+  // 魔力/体力回复（各自按回能/回体等级加速）
   if (isMage()) energy = Math.min(ENERGY_MAX, energy + energyRegen() * dt);
+  else if (isWarrior()) energy = Math.min(ENERGY_MAX, energy + staminaRegen() * dt);
 
   // 里程碑检测（每 100m 通知）
   milestoneFx = Math.max(0, milestoneFx - dt);
@@ -1879,7 +2018,7 @@ function update(dt) {
     if (bonusDist >= BONUS_DIST_MAX) {
       // 奖励空间结束
       bonusActive = false;
-      nextPortalDist = distanceM() + 1500 + Math.random() * 1500;
+      scheduleNextPortal(distanceM());
       transitionFx = 1.0;
       // 清除残留金币，恢复正常世界
       coins = [];
@@ -1968,7 +2107,15 @@ function update(dt) {
     if (skySprintTime >= skySprintDurActive) {
       skySprintActive = false;
       invincible = 2.0;
+      // 软着陆：贴地 + 落地姿态，避免瞬移感
       px = 0;
+      vy = 0;
+      onPlatformY = 0;
+      airAge = 0;
+      airJumpCount = 0;
+      canDoubleJump = false;
+      fastFalling = false;
+      landPoseT = 0.34;
       // 着陆安全区：30m（780px）内无障碍无怪物
       clearAhead(CHAR_X + 780, { featureCd: 4, gapCd: 4 });
     }
@@ -1997,16 +2144,19 @@ function update(dt) {
     if (ducking && tutorialShown && tutorialStep < TUTORIAL_STEPS.length && TUTORIAL_STEPS[tutorialStep].action === 'duck') tutorialActionDone = true;
     const wantJump = keys.has('KeyW') || keys.has('ArrowUp') || keys.has('Space');
 
-    // 检查是否还在高台上（走出了高台边缘就掉落）
+    // 检查是否还在高台上（走出了高台边缘就掉落；脚宽取样）
     if (onPlatformY > 0) {
       const onPlat = elevatedPlatforms.some((p) =>
-        CHAR_X >= p.x0 && CHAR_X <= p.x1 && p.y === onPlatformY
+        CHAR_X + 12 >= p.x0 && CHAR_X - 12 <= p.x1 && p.y === onPlatformY
       );
       if (!onPlat) onPlatformY = 0;
     }
 
     const currentGround = onPlatformY;
-    const grounded = px <= currentGround + 0.5 && vy <= 0 && (currentGround > 0 || groundAt(CHAR_X));
+    // 脚底取样：中心±脚宽，避免贴边落台/落地漏判
+    const footOnGround = currentGround > 0
+      || groundAt(CHAR_X - 12) || groundAt(CHAR_X) || groundAt(CHAR_X + 12);
+    const grounded = px <= currentGround + 0.5 && vy <= 0 && (currentGround > 0 || footOnGround);
 
     // 空中按下蹲伏 → 快速落地（教程冻结时不触发，避免提前落地）
     if (!tutFreeze && duckPressed && !grounded && !fastFalling) {
@@ -2061,8 +2211,12 @@ function update(dt) {
       const skipPlatLand = platformDropT > 0 || wantDrop;
       if (vy < 0 && !skipPlatLand) {
         let best = null;
+        const footL = CHAR_X - 12;
+        const footR = CHAR_X + 12;
         for (const p of elevatedPlatforms) {
-          if (CHAR_X >= p.x0 && CHAR_X <= p.x1 && oldPx > p.y && px <= p.y) {
+          // 脚宽与台面有重叠，且本帧穿越台面高度（含 2px 容差防高速漏判）
+          if (footR < p.x0 || footL > p.x1) continue;
+          if (oldPx > p.y - 2 && px <= p.y + 0.5) {
             if (!best || p.y > best.y) best = p;
           }
         }
@@ -2074,26 +2228,34 @@ function update(dt) {
           airJumpCount = 0;
           landPoseT = 0.26;
           airAge = 0;
-          if (fastFalling) { fastFalling = false; triggerRoll(); }
+          // 急坠落地：仅仍按住下才接翻滚，避免「一落地就滚」
+          if (fastFalling) {
+            fastFalling = false;
+            if (wantDrop) triggerRoll();
+          }
         }
       }
     }
-    // 地面着陆检测
-    if (!tutFreeze && onPlatformY === 0 && vy <= 0 && px <= 0 && groundAt(CHAR_X)) {
+    // 地面着陆检测（脚宽取样）
+    if (!tutFreeze && onPlatformY === 0 && vy <= 0 && px <= 0
+      && (groundAt(CHAR_X - 12) || groundAt(CHAR_X) || groundAt(CHAR_X + 12))) {
       if (airAge > 0.08) landPoseT = Math.max(landPoseT, 0.26);
       px = 0;
       vy = 0;
       canDoubleJump = false;
       airJumpCount = 0;
       airAge = 0;
-      if (fastFalling) { fastFalling = false; triggerRoll(); }
+      if (fastFalling) {
+        fastFalling = false;
+        if (wantDrop) triggerRoll();
+      }
     }
   }
   jumpPressed = false;
   duckPressed = false;
 
-  // 掉坑判定（阈值 -25，确保高速时能掉入坑洞；起飞中跳过）
-  if (px < -25 && !skySprintActive) {
+  // 掉坑判定（深度达 GAP_FALL_KILL 才结算，给二段跳/操作窗口；起飞中跳过）
+  if (px < -GAP_FALL_KILL && !skySprintActive) {
     escapePit();
     if (!running) return;
   }
@@ -2144,6 +2306,9 @@ function update(dt) {
     // 子步进：在旧位置和新位置之间均匀采样检测
     const travel = Math.hypot(fb.x - oldX, fb.y - oldY);
     const subSteps = Math.max(1, Math.ceil(travel / 14));
+    const fr = FB_R * (fb.rScale || 1);
+    const fh = Math.max(30, 30 * (fb.rScale || 1));
+    const dmg = fb.dmg != null ? fb.dmg : mageAtkPower();
     let hit = false;
     for (let s = 0; s <= subSteps && !hit; s++) {
       const u = s / subSteps;
@@ -2152,12 +2317,12 @@ function update(dt) {
       for (let j = monsters.length - 1; j >= 0; j--) {
         const mo = monsters[j];
         const mb = monsterHitBox(mo);
-        const fbb = { x: checkX - FB_R, y: checkY - 15, w: FB_R * 2, h: 30 };
+        const fbb = { x: checkX - fr, y: checkY - fh / 2, w: fr * 2, h: fh };
         if (overlap(fbb, mb)) {
-          mo.hp -= mageAtkPower();
+          mo.hp -= dmg;
           hit = true;
           sfxHit();
-          floats.push({ x: mo.x + mb.mw / 2, y: mb.y - 8, t: 0.7, text: `-${mageAtkPower()}` });
+          floats.push({ x: mo.x + mb.mw / 2, y: mb.y - 8, t: 0.7, text: `-${dmg}` });
           if (mo.hp <= 0) {
             monsters.splice(j, 1);
             killCount++;
@@ -2176,7 +2341,7 @@ function update(dt) {
         for (let j = flyers.length - 1; j >= 0; j--) {
           const f = flyers[j];
           const fy = f.baseY + Math.sin(animT * 2 + f.phase) * FLYER_AMP;
-          const fb2 = { x: checkX - FB_R, y: checkY - 15, w: FB_R * 2, h: 30 };
+          const fb2 = { x: checkX - fr, y: checkY - fh / 2, w: fr * 2, h: fh };
           const fbox = { x: f.x, y: fy - FLYER_H / 2, w: f.w, h: FLYER_H };
           if (overlap(fb2, fbox)) {
             flyers.splice(j, 1);
@@ -2191,10 +2356,10 @@ function update(dt) {
       if (!hit) {
         for (let j = bats.length - 1; j >= 0; j--) {
           const bat = bats[j];
-          const fb2 = { x: checkX - FB_R, y: checkY - 15, w: FB_R * 2, h: 30 };
+          const fb2 = { x: checkX - fr, y: checkY - fh / 2, w: fr * 2, h: fh };
           const bbox = { x: bat.x, y: bat.y - BAT_H / 2, w: BAT_W, h: BAT_H };
           if (overlap(fb2, bbox)) {
-            damageBat(bat, mageAtkPower());
+            damageBat(bat, dmg);
             hit = true;
             break;
           }
@@ -2342,7 +2507,92 @@ function drawStoneHudPanel(x, y, w, h, alpha) {
   ctx.fillRect(x + 3, y + 3, w - 6, 3);
 }
 
+let castleHudFont = null;
+
+function loadCastleHudFont() {
+  const img = new Image();
+  img.decoding = 'async';
+  const metaP = fetch('assets/fonts/castle-hud-digits.json?v=' + ASSET_VER)
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error('hud font meta'))))
+    .catch(() => null);
+  const imgP = new Promise((resolve, reject) => {
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('hud font img'));
+  });
+  img.src = 'assets/fonts/castle-hud-digits.png?v=' + ASSET_VER;
+  Promise.all([imgP, metaP]).then(([image, meta]) => {
+    if (!meta?.glyphs) return;
+    castleHudFont = {
+      img: image,
+      glyphs: meta.glyphs,
+      cellH: meta.cellH || 128,
+      lineHeight: meta.lineHeight || 110,
+    };
+  }).catch(() => { castleHudFont = null; });
+}
+loadCastleHudFont();
+
+function castleHudCanDraw(text) {
+  if (!castleHudFont?.img?.complete) return false;
+  const s = String(text);
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === ' ') continue;
+    if (!castleHudFont.glyphs[ch]) return false;
+  }
+  return s.length > 0;
+}
+
+function measureCastleHud(text, scale) {
+  let w = 0;
+  const s = String(text);
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === ' ') { w += 10 * scale; continue; }
+    const g = castleHudFont.glyphs[ch];
+    w += (g.advance || g.w) * scale;
+  }
+  return w;
+}
+
+function drawCastleHudText(text, x, y, opts = {}) {
+  const {
+    align = 'left',
+    baseline = 'alphabetic',
+    scale: scaleIn,
+    font: fontIn = '',
+  } = opts;
+  const m = /(\d+(?:\.\d+)?)px/.exec(fontIn);
+  const px = m ? Number(m[1]) : 15;
+  const scale = scaleIn || Math.max(0.22, Math.min(0.55, px / 72));
+  const s = String(text);
+  const total = measureCastleHud(s, scale);
+  let cursor = x;
+  if (align === 'center') cursor = x - total / 2;
+  else if (align === 'right') cursor = x - total;
+  let baselineY = y;
+  if (baseline === 'middle' || baseline === 'center') baselineY = y + (castleHudFont.lineHeight * scale) * 0.35;
+  else if (baseline === 'top') baselineY = y + castleHudFont.lineHeight * scale * 0.85;
+  const drawY = baselineY - castleHudFont.lineHeight * scale * 0.82;
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === ' ') { cursor += 10 * scale; continue; }
+    const g = castleHudFont.glyphs[ch];
+    const dw = g.w * scale;
+    const dh = g.h * scale;
+    ctx.drawImage(castleHudFont.img, g.x, g.y, g.w, g.h, cursor, drawY, dw, dh);
+    cursor += (g.advance || g.w) * scale;
+  }
+  ctx.restore();
+}
+
 function drawHudText(text, x, y, opts = {}) {
+  if (opts.bitmap !== false && castleHudCanDraw(text)) {
+    drawCastleHudText(text, x, y, opts);
+    return;
+  }
   const {
     fill = '#fffaf0',
     font: fontIn = `700 15px ${CASTLE_FONT}`,
@@ -2350,7 +2600,7 @@ function drawHudText(text, x, y, opts = {}) {
     stroke = 5,
     baseline = 'alphabetic',
   } = opts;
-  const font = /Noto|Cinzel|PingFang|YaHei|Microsoft|Segoe/.test(fontIn)
+  const font = /Noto|Cinzel|PingFang|YaHei|Microsoft|Segoe|DIN/.test(fontIn)
     ? fontIn
     : fontIn.replace(/system-ui|sans-serif|serif/g, CASTLE_FONT);
   ctx.save();
@@ -2934,22 +3184,21 @@ function drawCastleLayer(parallax, baseY, alpha, fill) {
 }
 
 function drawBackground() {
-  // 奖励空间与日常共用跑酷走廊；仅用暖金氛围区分（不再换整张金库立绘）
+  // 日常：夜空 + 城堡走廊；奖励：宝库另一空间（不画日常走廊）
   if (_bgCacheFrame % 3 === 0) {
     _bgGrad = ctx.createLinearGradient(0, 0, 0, H);
     if (bonusActive) {
-      _bgGrad.addColorStop(0, '#141a32');
-      _bgGrad.addColorStop(0.3, '#222850');
-      _bgGrad.addColorStop(0.6, '#3a3358');
-      _bgGrad.addColorStop(0.85, '#4a3a48');
-      _bgGrad.addColorStop(1, '#4a3840');
-      _bgGlow1 = ctx.createRadialGradient(W * 0.72, 70, 8, W * 0.72, 100, 280);
-      _bgGlow1.addColorStop(0, 'rgba(255,230,160,0.45)');
-      _bgGlow1.addColorStop(0.4, 'rgba(255,200,120,0.12)');
-      _bgGlow1.addColorStop(1, 'rgba(180,120,60,0)');
-      _bgGlow2 = ctx.createRadialGradient(W * 0.35, GROUND - 10, 10, W * 0.35, GROUND, 280);
-      _bgGlow2.addColorStop(0, 'rgba(255,190,90,0.2)');
-      _bgGlow2.addColorStop(1, 'rgba(120,60,40,0)');
+      _bgGrad.addColorStop(0, '#1a1028');
+      _bgGrad.addColorStop(0.35, '#2a1840');
+      _bgGrad.addColorStop(0.7, '#3a2448');
+      _bgGrad.addColorStop(1, '#4a3030');
+      _bgGlow1 = ctx.createRadialGradient(W * 0.5, H * 0.28, 20, W * 0.5, H * 0.4, 360);
+      _bgGlow1.addColorStop(0, 'rgba(255,210,120,0.35)');
+      _bgGlow1.addColorStop(0.45, 'rgba(180,100,200,0.12)');
+      _bgGlow1.addColorStop(1, 'rgba(40,20,60,0)');
+      _bgGlow2 = ctx.createRadialGradient(W * 0.5, GROUND, 20, W * 0.5, GROUND, 320);
+      _bgGlow2.addColorStop(0, 'rgba(255,190,90,0.28)');
+      _bgGlow2.addColorStop(1, 'rgba(80,40,20,0)');
     } else {
       _bgGrad.addColorStop(0, '#12182e');
       _bgGrad.addColorStop(0.28, '#1c2448');
@@ -2969,6 +3218,12 @@ function drawBackground() {
 
   ctx.fillStyle = _bgGrad;
   ctx.fillRect(0, 0, W, H);
+
+  if (bonusActive) {
+    drawBonusVaultBackdrop();
+    return;
+  }
+
   if (_bgGlow1) {
     ctx.fillStyle = _bgGlow1;
     ctx.fillRect(0, 0, W, GROUND);
@@ -2981,9 +3236,7 @@ function drawBackground() {
     const tw = 0.35 + 0.65 * Math.abs(Math.sin(animT * 1.4 + i));
     const sz = 1 + (i % 3 === 0 ? 1 : 0);
     ctx.globalAlpha = tw * 0.75 * (0.2 + 0.8 * outOpen);
-    ctx.fillStyle = bonusActive
-      ? (i % 4 === 0 ? 'rgba(255,220,140,0.95)' : 'rgba(255,255,240,0.8)')
-      : (i % 5 === 0 ? 'rgba(255,230,180,0.95)' : 'rgba(255,255,255,0.85)');
+    ctx.fillStyle = i % 5 === 0 ? 'rgba(255,230,180,0.95)' : 'rgba(255,255,255,0.85)';
     ctx.fillRect(sx, sy, sz, sz);
   }
   ctx.globalAlpha = 1;
@@ -2991,13 +3244,13 @@ function drawBackground() {
   const moonX = W * 0.76;
   const moonY = 64;
   ctx.globalAlpha = 0.3 + 0.7 * outOpen;
-  const halo = ctx.createRadialGradient(moonX, moonY, 8, moonX, moonY, bonusActive ? 80 : 70);
-  halo.addColorStop(0, bonusActive ? 'rgba(255,230,160,0.42)' : 'rgba(255,245,210,0.35)');
-  halo.addColorStop(1, bonusActive ? 'rgba(255,180,80,0)' : 'rgba(180,170,255,0)');
+  const halo = ctx.createRadialGradient(moonX, moonY, 8, moonX, moonY, 70);
+  halo.addColorStop(0, 'rgba(255,245,210,0.35)');
+  halo.addColorStop(1, 'rgba(180,170,255,0)');
   ctx.fillStyle = halo;
-  ctx.beginPath(); ctx.arc(moonX, moonY, bonusActive ? 80 : 70, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(moonX, moonY, 70, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = 'rgba(255,248,220,0.95)';
-  ctx.beginPath(); ctx.arc(moonX, moonY, bonusActive ? 26 : 24, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(moonX, moonY, 24, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = 'rgba(26,32,64,0.5)';
   ctx.beginPath(); ctx.arc(moonX - 9, moonY - 4, 19, 0, Math.PI * 2); ctx.fill();
   ctx.globalAlpha = 1;
@@ -3010,9 +3263,67 @@ function drawBackground() {
   drawCastleCorridor();
   const vig = ctx.createRadialGradient(W * 0.5, GROUND * 0.45, 120, W * 0.5, GROUND * 0.5, 520);
   vig.addColorStop(0, 'rgba(0,0,0,0)');
-  vig.addColorStop(1, bonusActive ? 'rgba(40,24,8,0.22)' : 'rgba(8,6,16,0.28)');
+  vig.addColorStop(1, 'rgba(8,6,16,0.28)');
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, W, GROUND);
+}
+
+/** 奖励空间专属：宝库大厅底图，不画日常城墙走廊 */
+function drawBonusVaultBackdrop() {
+  const bg = WORLD_ASSETS.bonusBg;
+  if (bg?.ready && bg.img?.width) {
+    const img = bg.img;
+    const scale = Math.max(W / img.width, (GROUND + 40) / img.height);
+    const dw = img.width * scale;
+    const dh = img.height * scale;
+    const scroll = (worldX * 0.06) % dw;
+    const dy = GROUND - dh * 0.82;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, W, GROUND);
+    ctx.clip();
+    ctx.drawImage(img, -scroll, dy, dw, dh);
+    ctx.drawImage(img, -scroll + dw, dy, dw, dh);
+    ctx.restore();
+  } else {
+    // 贴图未就绪时的程序化宝库墙
+    ctx.fillStyle = '#2a1c38';
+    ctx.fillRect(0, 0, W, GROUND);
+    for (let i = 0; i < 6; i++) {
+      const x = ((i * 160 - worldX * 0.1) % (W + 160) + W + 160) % (W + 160) - 40;
+      ctx.fillStyle = 'rgba(196,164,104,0.12)';
+      ctx.fillRect(x, GROUND - 160, 28, 160);
+      ctx.fillStyle = 'rgba(255,200,100,0.2)';
+      ctx.fillRect(x + 8, GROUND - 120, 8, 14);
+    }
+  }
+
+  if (_bgGlow1) {
+    ctx.fillStyle = _bgGlow1;
+    ctx.fillRect(0, 0, W, GROUND);
+  }
+  if (_bgGlow2) {
+    ctx.fillStyle = _bgGlow2;
+    ctx.fillRect(0, GROUND - 160, W, 180);
+  }
+
+  // 金尘微粒（区别于夜空星点）
+  for (let i = 0; i < 18; i++) {
+    const sx = ((i * 73 + worldX * 0.04) % W + W) % W;
+    const sy = 40 + (i * 29) % (GROUND - 80);
+    const a = 0.2 + 0.45 * Math.abs(Math.sin(animT * 1.8 + i));
+    ctx.globalAlpha = a;
+    ctx.fillStyle = i % 3 === 0 ? 'rgba(255,220,140,0.95)' : 'rgba(230,180,255,0.7)';
+    ctx.fillRect(sx, sy, 2, 2);
+  }
+  ctx.globalAlpha = 1;
+
+  // 底部暗角，让跑道更可读
+  const vig = ctx.createLinearGradient(0, GROUND - 100, 0, GROUND);
+  vig.addColorStop(0, 'rgba(20,12,28,0)');
+  vig.addColorStop(1, 'rgba(20,12,28,0.35)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, GROUND - 100, W, 100);
 }
 
 // ===================== 实体渲染 =====================
@@ -3028,14 +3339,23 @@ function brickShade(col, row) {
 }
 
 function drawBrickFace(x, y, w, h, tone) {
-  // tone 0..1 → 略深/略浅的石砖（提亮，带一点紫灰古堡色）
+  // tone 0..1；奖励空间偏金砖，日常偏紫灰石砖
   const base = 72 + tone * 24;
-  const r = (base * 0.94) | 0;
-  const g = (base * 0.86) | 0;
-  const b = (base * 0.96) | 0;
-  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  let r; let g; let b;
+  if (bonusActive) {
+    r = (base * 1.15) | 0;
+    g = (base * 0.92) | 0;
+    b = (base * 0.55) | 0;
+  } else {
+    r = (base * 0.94) | 0;
+    g = (base * 0.86) | 0;
+    b = (base * 0.96) | 0;
+  }
+  ctx.fillStyle = `rgb(${Math.min(255, r)},${Math.min(255, g)},${Math.min(255, b)})`;
   ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = `rgba(220,200,170,${0.11 + tone * 0.06})`;
+  ctx.fillStyle = bonusActive
+    ? `rgba(255,220,140,${0.14 + tone * 0.08})`
+    : `rgba(220,200,170,${0.11 + tone * 0.06})`;
   ctx.fillRect(x, y, w, 2);
   ctx.fillStyle = 'rgba(0,0,0,0.26)';
   ctx.fillRect(x, y + h - 2, w, 2);
@@ -3045,7 +3365,7 @@ function drawBrickFace(x, y, w, h, tone) {
     ctx.fillStyle = 'rgba(0,0,0,0.12)';
     ctx.fillRect(x + w * 0.3, y + h * 0.45, 3, 2);
   } else if (tone < 0.25) {
-    ctx.fillStyle = 'rgba(196,164,104,0.1)';
+    ctx.fillStyle = bonusActive ? 'rgba(255,210,120,0.16)' : 'rgba(196,164,104,0.1)';
     ctx.fillRect(x + 3, y + 3, Math.max(4, w * 0.25), 2);
   }
 }
@@ -3058,8 +3378,8 @@ function brickOverlapsGap(x, w) {
 }
 
 function drawGround() {
-  // 灰缝底色（略提亮，避免整条黑带）
-  ctx.fillStyle = '#2a2430';
+  // 灰缝底色；奖励空间偏深金褐
+  ctx.fillStyle = bonusActive ? '#3a2a1c' : '#2a2430';
   ctx.fillRect(0, GROUND, W, H - GROUND);
 
   const scroll = worldX;
@@ -3531,7 +3851,7 @@ function drawFireballs() {
   }
   for (const fb of fireballs) {
     const birth = fb.birth != null && fb.birth > 0 ? fb.birth : 0;
-    const scale = birth > 0 ? (1 - birth / 0.14) * 0.55 + 0.45 : 1;
+    const scale = (birth > 0 ? (1 - birth / 0.14) * 0.55 + 0.45 : 1) * (fb.rScale || 1);
     const size = FB_R * 3.2 * scale * (fb.orbit ? 0.92 : 1);
     if (drawWorldSprite(WORLD_ASSETS.fireball, fb.x, fb.y, size, 'center')) continue;
     ctx.fillStyle = 'rgba(255,120,40,0.35)';
@@ -4114,16 +4434,20 @@ function drawFloats() {
   }
 }
 
-function drawEnergyBar(x, y, w = 96, h = 14) {
+function drawEnergyBar(x, y, label = '魔力', w = 96, h = 14) {
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
   ctx.strokeStyle = 'rgba(196,164,104,0.55)';
   ctx.lineWidth = 1;
   ctx.strokeRect(x - 1.5, y - 1.5, w + 3, h + 3);
   const ratio = energy / ENERGY_MAX;
-  ctx.fillStyle = ratio > 0.6 ? '#5a9a8a' : ratio > 0.3 ? '#c4a468' : '#c45c4a';
+  // 战士体力偏暖橙，法师魔力偏青绿
+  const full = isWarrior() ? '#c4884a' : '#5a9a8a';
+  const mid = '#c4a468';
+  const low = '#c45c4a';
+  ctx.fillStyle = ratio > 0.6 ? full : ratio > 0.3 ? mid : low;
   ctx.fillRect(x, y, w * ratio, h);
-  drawHudText('魔力', x + w / 2, y + h / 2 + 1, {
+  drawHudText(label, x + w / 2, y + h / 2 + 1, {
     fill: '#fffaf0',
     font: 'bold 11px "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif',
     align: 'center',
@@ -4140,7 +4464,7 @@ function drawHUD() {
   const iconGap = iconSize + 6;
   const shieldY = hpY + iconGap;
   const energyY = shieldY + iconGap;
-  const leftPanelH = isMage() ? 84 : 58;
+  const leftPanelH = 84;
   drawStoneHudPanel(panelX, 8, 118, leftPanelH);
 
   for (let i = 0; i < charMaxHpSlots(); i++) {
@@ -4191,7 +4515,8 @@ function drawHUD() {
     drawHudText('庇' + knightShelter, kx - 2, ky + 4, { fill: '#ffe08a', font: 'bold 11px system-ui,sans-serif', stroke: 3 });
   }
 
-  if (isMage()) drawEnergyBar(hudX - 4, energyY);
+  if (isMage()) drawEnergyBar(hudX - 4, energyY, '魔力');
+  else if (isWarrior()) drawEnergyBar(hudX - 4, energyY, '体力');
 
   const isLandscapeHud = document.getElementById('screen-game').classList.contains('game-landscape');
   if (isLandscapeHud) {
@@ -4201,7 +4526,7 @@ function drawHUD() {
     drawStoneHudPanel(scoreX, 6, scoreW, scoreH);
     if (bonusActive) {
       const remain = Math.max(0, BONUS_DIST_MAX - bonusDist);
-      drawHudText('奖励空间 ' + remain.toFixed(0) + 'm', W / 2, 18, {
+      drawHudText('宝库空间 ' + remain.toFixed(0) + 'm', W / 2, 18, {
         fill: '#ffe08a', font: 'bold 11px system-ui,sans-serif', align: 'center', stroke: 2.5,
       });
       drawHudText('' + scoreVal(), W / 2, 40, {
@@ -4448,13 +4773,14 @@ function drawPortal() {
 
 function drawBonusTint() {
   if (!bonusActive) return;
-  // 轻暖金罩，保持跑酷走廊可读性（不做糖果粒子）
-  const pulse = 0.07 + 0.02 * Math.sin(animT * 1.4);
-  ctx.fillStyle = `rgba(255,210,120,${pulse})`;
-  ctx.fillRect(0, 0, W, H);
-  const wash = ctx.createRadialGradient(W * 0.5, GROUND * 0.35, 40, W * 0.5, GROUND * 0.5, 420);
-  wash.addColorStop(0, 'rgba(255,230,160,0.1)');
-  wash.addColorStop(1, 'rgba(255,180,80,0)');
+  // 轻紫金罩，强化「另一空间」而不糊掉宝库底图
+  const pulse = 0.04 + 0.015 * Math.sin(animT * 1.4);
+  ctx.fillStyle = `rgba(120,60,160,${pulse})`;
+  ctx.fillRect(0, 0, W, GROUND);
+  const wash = ctx.createRadialGradient(W * 0.5, GROUND * 0.4, 30, W * 0.5, GROUND * 0.55, 380);
+  wash.addColorStop(0, 'rgba(255,220,140,0.12)');
+  wash.addColorStop(0.55, 'rgba(180,100,200,0.05)');
+  wash.addColorStop(1, 'rgba(40,20,60,0)');
   ctx.fillStyle = wash;
   ctx.fillRect(0, 0, W, GROUND);
 }
@@ -4467,7 +4793,7 @@ function drawBonusHud() {
   ctx.fillStyle = 'rgba(12,10,18,0.72)';
   ctx.fillRect(W / 2 - 100, 14, 200, 32);
   const remain = Math.max(0, BONUS_DIST_MAX - bonusDist);
-  drawHudText(`奖励空间 ${remain.toFixed(0)}m`, W / 2, 35, {
+  drawHudText(`宝库空间 ${remain.toFixed(0)}m`, W / 2, 35, {
     fill: '#ffe8a0', font: 'bold 14px system-ui,sans-serif', align: 'center', stroke: 4,
   });
   const activeList = [];
@@ -4486,19 +4812,37 @@ function drawBonusHud() {
 }
 
 function drawPortalHint() {
-  if (!portal || bonusActive) return;
+  if (bonusActive) return;
+  // 门尚未刷出：按下次门距离预告
+  if (!portal) {
+    const remainM = nextPortalDist - distanceM();
+    if (remainM > 0 && remainM <= 220) {
+      const alpha = Math.min(0.92, 1 - remainM / 220);
+      ctx.save();
+      ctx.globalAlpha = alpha * (0.8 + Math.sin(animT * 4) * 0.2);
+      drawHudText(`宝库门 ${Math.ceil(remainM)}m`, W - 12, 78, {
+        fill: '#e8d8ff', font: 'bold 13px system-ui,sans-serif', align: 'right', stroke: 3.5,
+      });
+      ctx.restore();
+    }
+    return;
+  }
   if (portal.x > W) {
     const dist = portal.x - W;
-    const alpha = Math.min(0.9, 1 - dist / 400);
+    const alpha = Math.min(0.95, 1 - dist / 520);
     if (alpha > 0) {
       const pulse = 0.75 + Math.sin(animT * 5) * 0.25;
       ctx.save();
       ctx.globalAlpha = alpha * pulse;
-      drawHudText('→ 传送门', W - 12, 78, {
+      drawHudText('→ 靠近进入宝库空间', W - 12, 78, {
         fill: '#e0d0ff', font: 'bold 13px system-ui,sans-serif', align: 'right', stroke: 3.5,
       });
       ctx.restore();
     }
+  } else {
+    drawHudText('旋涡 · 跑入即进入', W - 12, 78, {
+      fill: '#ffe8a0', font: 'bold 13px system-ui,sans-serif', align: 'right', stroke: 3.5,
+    });
   }
 }
 
@@ -4531,7 +4875,7 @@ function drawItems() {
 
   if (itemShield > 0) {
     const sx = 10;
-    const sy = isMage() ? 96 : 70;
+    const sy = 96;
     drawStoneHudPanel(sx, sy, 108, 20, 0.82);
     drawHudText('起飞充能 ×' + itemShield, sx + 6, sy + 14, {
       fill: '#e8d8ff', font: 'bold 11px "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif', stroke: 3,
@@ -4639,6 +4983,19 @@ function draw() {
   drawTutorial();
   drawTransitionFx();
   drawOverlay();
+  drawPauseOverlay();
+}
+
+function drawPauseOverlay() {
+  if (!paused || !running || over) return;
+  ctx.fillStyle = 'rgba(0,0,0,.58)';
+  ctx.fillRect(0, 0, W, H);
+  drawHudText('已暂停', W / 2, H / 2 - 28, {
+    fill: '#fffaf0', font: 'bold 34px "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif', align: 'center', stroke: 6,
+  });
+  drawHudText('Esc / 继续 · 回主页离开本局', W / 2, H / 2 + 14, {
+    fill: '#f0e8d8', font: 'bold 15px "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif', align: 'center', stroke: 4,
+  });
 }
 
 // ===================== 性能监控 =====================
@@ -4690,7 +5047,7 @@ function frame(ts) {
   lastTs = ts;
   animT += dt;
 
-  if (running) {
+  if (running && !paused) {
     const t0 = performance.now();
     update(dt);
     perfUpdateMs = performance.now() - t0;
@@ -4726,7 +5083,12 @@ function drawPerfOverlay() {
 const gameScreen = document.getElementById('screen-game');
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Escape') {
-    if (gameScreen.classList.contains('active')) backToMenu();
+    if (!gameScreen.classList.contains('active')) return;
+    if (running && !over) {
+      togglePause();
+      return;
+    }
+    backToMenu();
     return;
   }
   if (e.code === 'KeyF') {
@@ -4741,6 +5103,14 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.code === 'KeyM') {
     toggleMute();
+    return;
+  }
+  if (paused && running && !over) {
+    // 暂停中仅允许继续快捷键（Esc 上方已处理）
+    if (e.code === 'Enter' || e.code === 'Space') {
+      e.preventDefault();
+      setPaused(false);
+    }
     return;
   }
   if (e.code === 'Enter') {
@@ -4808,7 +5178,7 @@ canvas.addEventListener('touchend', (e) => {
 // PC：鼠标左键攻击（仅点在画布上，避免误触 UI）
 canvas.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return;
-  if (!gameScreen.classList.contains('active') || !running || over) return;
+  if (!gameScreen.classList.contains('active') || !running || over || paused) return;
   e.preventDefault();
   attack();
 });
@@ -4819,6 +5189,7 @@ function bindCtrlBtn(btnId, keyCode) {
   const btn = document.getElementById(btnId);
   const press = (e) => {
     e.preventDefault();
+    if (paused) return;
     if (keyCode === 'KeyW' && !keys.has(keyCode)) jumpPressed = true;
     if (keyCode === 'KeyS' && !keys.has(keyCode)) duckPressed = true;
     keys.add(keyCode);
@@ -5118,7 +5489,21 @@ function armBootWatchdog() {
 function noteAssetSettled() {
   assetsFinished += 1;
   updateBootProgress(assetsFinished, Math.max(assetsPending, 1), '加载中…');
-  if (assetsPending > 0 && assetsFinished >= assetsPending) {
+  try {
+    const menuOn = document.getElementById('screen-menu')?.classList.contains('active');
+    const charOn = document.getElementById('screen-char')?.classList.contains('active');
+    if (menuOn) refreshMainMenu();
+    if (charOn) refreshCharScreen();
+  } catch (_) { /* ignore */ }
+  tryFinishBootLoading();
+}
+
+/** 必须等首启队列全部 track 完，再允许 finish（避免缓存同步 settle 过早关 boot / 立绘停在转圈） */
+let bootEnqueueDone = false;
+
+function tryFinishBootLoading() {
+  if (!bootEnqueueDone || assetsReady) return;
+  if (assetsPending === 0 || assetsFinished >= assetsPending) {
     tryNotifyGameplayReady();
     finishBootLoading();
     scheduleDeferredAssets();
@@ -5228,6 +5613,7 @@ function loadPortraitAssets() {
       return null;
     })
     .finally(() => {
+      bootEnqueueDone = false;
       assetsPending = 0;
       assetsFinished = 0;
       const queue = [
@@ -5246,11 +5632,8 @@ function loadPortraitAssets() {
         }
         trackImageAsset(a);
       }
-      if (assetsPending === 0) {
-        tryNotifyGameplayReady();
-        finishBootLoading();
-        scheduleDeferredAssets();
-      }
+      bootEnqueueDone = true;
+      tryFinishBootLoading();
     });
 }
 
@@ -5794,6 +6177,7 @@ function refreshCharScreen() {
       buildUpgradeRow('生命值', '上限 5 点', w.hp, WARRIOR_HP_MAX, UP_COST_WARRIOR_HP(w.hp), 'war-hp', g >= UP_COST_WARRIOR_HP(w.hp)),
       buildUpgradeRow('护盾', '上限 2 层', w.shd, WARRIOR_SHD_MAX, UP_COST_WARRIOR_SHD(), 'war-shd', g >= UP_COST_WARRIOR_SHD()),
       buildUpgradeRow('攻击力', warriorAtkDesc(w.atk), w.atk, WARRIOR_ATK_MAX, UP_COST_WARRIOR_ATK(w.atk), 'war-atk', g >= UP_COST_WARRIOR_ATK(w.atk)),
+      buildUpgradeRow('回体速度', '每级 +10%，最高 +50%', w.st, WARRIOR_ST_MAX, UP_COST_WARRIOR_ST(w.st), 'war-st', g >= UP_COST_WARRIOR_ST(w.st)),
       buildUpgradeRow('骑士庇护', talentDesc(w.talent), w.talent, TALENT_MAX, tCost, 'war-talent', g >= tCost),
     ].join('');
   }
@@ -5833,6 +6217,10 @@ function buyCharUpgrade(key) {
     const w = charData.warrior; const c = UP_COST_WARRIOR_ATK(w.atk);
     if (w.atk >= WARRIOR_ATK_MAX || g < c) return;
     gold -= c; w.atk++;
+  } else if (key === 'war-st') {
+    const w = charData.warrior; const c = UP_COST_WARRIOR_ST(w.st);
+    if (w.st >= WARRIOR_ST_MAX || g < c) return;
+    gold -= c; w.st++;
   } else if (key === 'war-talent') {
     const w = charData.warrior;
     const c = w.talent < 1 ? TALENT_UNLOCK_COST : TALENT_UP_COST(w.talent);
@@ -6115,8 +6503,22 @@ volSfxSlider.addEventListener('input', () => {
   setSfxVolume(volSfxSlider.value / 100);
   sfxJump(); // 预览音效
 });
-startBtn.addEventListener('click', () => { if (!running) reset(); });
+startBtn.addEventListener('click', () => {
+  if (paused && running && !over) {
+    setPaused(false);
+    return;
+  }
+  if (!running) reset();
+});
 homeBtn.addEventListener('click', () => backToMenu());
+const pauseBtnEl = document.getElementById('btn-pause');
+if (pauseBtnEl) {
+  pauseBtnEl.style.display = 'none';
+  pauseBtnEl.addEventListener('click', () => {
+    if (!running || over) return;
+    togglePause();
+  });
+}
 
 // ===================== 横屏切换 =====================
 async function toggleLandscape() {

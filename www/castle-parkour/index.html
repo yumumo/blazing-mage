@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="color-scheme" content="dark" />
   <title>古堡跑酷</title>
-  <script src="js/boot-mobile.js?v=20260819d"></script>
-  <link rel="stylesheet" href="css/app.css?v=20260819d" />
+  <script src="js/boot-mobile.js?v=20260819s"></script>
+  <link rel="stylesheet" href="css/app.css?v=20260819s" />
 </head>
 <body>
   <div id="boot-loading" class="boot-loading" aria-live="polite" aria-busy="true" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
@@ -16,20 +16,24 @@
     <p class="boot-loading-text">加载中… 0%</p>
   </div>
 
-  <div class="deco d-circle"></div>
-  <div class="deco d-semi"></div>
-  <div class="deco d-tri"></div>
-  <div class="deco d-cross"></div>
-  <div class="deco d-dots"></div>
-  <div class="deco d-zig"></div>
+  <div class="deco d-moon" aria-hidden="true"></div>
+  <div class="deco d-vignette" aria-hidden="true"></div>
 
   <div class="wrap">
 
     <div id="screen-menu" class="screen active">
       <div class="menu-top">
         <div class="menu-gold-bar"><span>金币</span><b id="menu-gold">0</b></div>
-        <div class="title-wrap"><div class="title">古堡跑酷</div></div>
-        <div class="subtitle">月夜城墙 · 一路向前</div>
+        <div class="title-wrap">
+          <h1 class="title title-wordmark">
+            <img src="assets/fonts/castle-display-wordmark.png?v=20260819s" width="800" height="384" alt="" decoding="async" />
+            <span class="sr-only">古堡跑酷</span>
+          </h1>
+        </div>
+        <p class="subtitle subtitle-wordmark">
+          <img src="assets/fonts/castle-ui-subtitle.png?v=20260819s" width="640" height="116" alt="" decoding="async" />
+          <span class="sr-only">月夜城墙 · 一路向前</span>
+        </p>
       </div>
       <div class="menu-hub">
         <div class="menu-portrait-panel">
@@ -38,21 +42,32 @@
             <div class="menu-char-name" id="menu-char-name">法师</div>
           </div>
         </div>
-        <div class="menu-actions">
-          <button class="primary" id="menu-start">开始游戏</button>
-          <button class="attr" id="menu-char" type="button">角色</button>
-          <button class="stats" id="menu-shop" type="button">道具商店</button>
-          <button class="stats" id="menu-stats" type="button">统计</button>
-          <button class="stats" id="menu-landscape" type="button">全屏横屏</button>
-          <button class="stats" id="menu-settings" type="button">设置</button>
-          <button class="danger" id="menu-exit" type="button">退出游戏</button>
+        <div class="menu-actions menu-actions-col">
+          <button class="primary btn-wordmark" id="menu-start" type="button" aria-label="开始游戏">
+            <img src="assets/fonts/castle-ui-start.png?v=20260819s" width="560" height="305" alt="" decoding="async" />
+          </button>
+          <button class="attr btn-wordmark" id="menu-char" type="button" aria-label="角色">
+            <img src="assets/fonts/castle-ui-char.png?v=20260819s" width="284" height="256" alt="" decoding="async" />
+          </button>
+          <button class="stats btn-wordmark" id="menu-shop" type="button" aria-label="道具商店">
+            <img src="assets/fonts/castle-ui-shop.png?v=20260819s" width="450" height="228" alt="" decoding="async" />
+          </button>
+          <button class="stats btn-wordmark" id="menu-stats" type="button" aria-label="统计">
+            <img src="assets/fonts/castle-ui-stats.png?v=20260819s" width="308" height="254" alt="" decoding="async" />
+          </button>
+          <button class="stats btn-wordmark" id="menu-settings" type="button" aria-label="设置">
+            <img src="assets/fonts/castle-ui-settings.png?v=20260819s" width="294" height="255" alt="" decoding="async" />
+          </button>
+          <button class="danger btn-wordmark" id="menu-exit" type="button" aria-label="退出游戏">
+            <img src="assets/fonts/castle-ui-exit.png?v=20260819s" width="560" height="338" alt="" decoding="async" />
+          </button>
+          <button class="ghost menu-landscape-link" id="menu-landscape" type="button">全屏横屏</button>
         </div>
       </div>
     </div>
 
     <div id="screen-game" class="screen">
       <div class="frame-outer">
-        <div class="sticker">RUN</div>
         <canvas id="game" width="800" height="500"></canvas>
       </div>
       <div class="orientation-tip">手机竖屏可玩，横屏体验更好</div>
@@ -65,17 +80,18 @@
       <div class="tips">
         <kbd>W</kbd>/<kbd>↑</kbd>/<kbd>空格</kbd> 跳跃（空中可二段跳）
         &nbsp;<kbd>S</kbd>/<kbd>↓</kbd> 翻滚
-        &nbsp;<kbd>J</kbd>/鼠标左键 攻击（法师耗能量）
+        &nbsp;<kbd>J</kbd>/鼠标左键 攻击（法师大火球耗尽能量）
         &nbsp;<kbd>1-4</kbd> 道具
         &nbsp;<kbd>空格</kbd>/回车/按键 开始·重开
         &nbsp;<kbd>F</kbd> 全屏
         &nbsp;<kbd>M</kbd> 静音
         &nbsp;<kbd>P</kbd> 性能监控
-        &nbsp;<kbd>Esc</kbd> 返回
+        &nbsp;<kbd>Esc</kbd> 暂停 / 继续
       </div>
       <div class="item-equip" id="item-equip"></div>
       <div class="btn-row">
         <button id="start">开始游戏</button>
+        <button id="btn-pause" type="button" style="display:none">暂停</button>
         <button id="home" style="display:none">回到主页</button>
         <button id="btn-landscape">横屏模式</button>
       </div>
@@ -92,7 +108,10 @@
 
     <div id="screen-stats" class="screen">
       <div class="panel">
-        <h2>统计</h2>
+        <h2 class="panel-title-wordmark">
+          <img src="assets/fonts/castle-ui-stats.png?v=20260819s" width="308" height="254" alt="" decoding="async" />
+          <span class="sr-only">统计</span>
+        </h2>
         <div class="stat-row"><span>最远距离</span><b id="st-best">0</b><small>m</small></div>
         <div class="stat-row"><span>游戏次数</span><b id="st-plays">0</b></div>
         <div class="stat-row"><span>累计时长</span><b id="st-time">0 秒</b></div>
@@ -107,7 +126,10 @@
           <canvas id="char-portrait" width="180" height="260"></canvas>
         </div>
         <div class="panel char-panel">
-          <h2>角色</h2>
+          <h2 class="panel-title-wordmark">
+            <img src="assets/fonts/castle-ui-char.png?v=20260819s" width="284" height="256" alt="" decoding="async" />
+            <span class="sr-only">角色</span>
+          </h2>
           <div class="gold-bar">金币 <b id="char-gold">0</b></div>
           <div class="char-tabs">
             <button type="button" class="char-tab active" id="tab-mage">法师</button>
@@ -128,7 +150,10 @@
 
     <div id="screen-shop" class="screen">
       <div class="panel">
-        <h2>道具商店</h2>
+        <h2 class="panel-title-wordmark panel-title-wide">
+          <img src="assets/fonts/castle-ui-shop.png?v=20260819s" width="450" height="228" alt="" decoding="async" />
+          <span class="sr-only">道具商店</span>
+        </h2>
         <div class="gold-bar">金币 <b id="shop-gold">0</b></div>
         <div class="shop-card" id="shop-card-magnet">
           <div class="icon-big">🧲</div>
@@ -174,7 +199,12 @@
     <div id="screen-exit" class="screen">
       <div class="exit-box">
         <div class="big">🌙</div>
-        <div class="title-wrap"><div class="title">感谢游玩</div></div>
+        <div class="title-wrap">
+          <div class="title title-wordmark title-wordmark-sm">
+            <img src="assets/fonts/castle-ui-thanks.png?v=20260819s" width="436" height="227" alt="" decoding="async" />
+            <span class="sr-only">感谢游玩</span>
+          </div>
+        </div>
         <p>已退出古堡跑酷，欢迎再来</p>
         <button class="back" id="exit-back">返回主界面</button>
       </div>
@@ -182,7 +212,10 @@
 
     <div id="screen-settings" class="screen">
       <div class="panel">
-        <h2>设置</h2>
+        <h2 class="panel-title-wordmark">
+          <img src="assets/fonts/castle-ui-settings.png?v=20260819s" width="294" height="255" alt="" decoding="async" />
+          <span class="sr-only">设置</span>
+        </h2>
         <div class="stat-row" style="flex-direction:column;align-items:stretch;gap:8px">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <span>背景音乐</span>
@@ -204,6 +237,6 @@
     </div>
 
   </div>
-  <script type="module" src="js/main.js?v=20260819d"></script>
+  <script type="module" src="js/main.js?v=20260819s"></script>
 </body>
 </html>

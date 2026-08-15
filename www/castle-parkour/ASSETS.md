@@ -76,6 +76,22 @@
 
 运动 sheet：`dev/build_monster_motion_sheets.py` / `dev/pack_motion_grids.py`。精细手绘可直接覆盖同名文件后 measure。
 
+## 字体（Castle Type）
+
+| 文件 | 用途 |
+|------|------|
+| `assets/fonts/castle-display-wordmark.png` | 主标题「古堡跑酷」 |
+| `assets/fonts/castle-ui-*.png` | 副标题 / 面板标题 / 开始·退出 等牌匾 |
+| `assets/fonts/castle-hud-digits.png` + `.json` | 局内 HUD 数字位图字 |
+
+重编 HUD 数字：`python dev/compile_castle_hud_font.py`（在本 Core 仓根执行）
+
+## 上传注意
+
+- **必须入库**：`*-jump-sheet.png` / `*-atk-sheet.png`（局内运动真源，勿再 ignore）
+- **勿入库**：`dev/art-raw/`、`dev/_*.py`、散帧 `mage-run0.png` 等
+- 发版前确认 `ASSET_VER` = `build-id.txt` = HTML `?v=` = `EMBEDDED_BUILD`
+
 ## 元数据
 
 `assets/sprite-manifest.json` — content 盒与 sheet 分格；改 PNG 后重跑 measure / bake。
@@ -84,7 +100,7 @@
 
 | 文件 | 去向 |
 |------|------|
-| `dev/art-sheets/*-jump-sheet` / `*-atk-sheet`（带首尾跑步尺的验收表） | 验收 only |
+| `dev/art-sheets/*` 验收表 | 验收 only（**不是** `www/.../assets/*-jump-sheet.png`） |
 | `dev/art-raw/singles/*` | 调试散帧 |
 | `dev/art-raw/*-spun.png` / `*-roll-sheet-9.png` | 滚表重建备份 |
 | `dev/art-raw/` 其余 | 本机 only |
