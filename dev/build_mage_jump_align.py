@@ -13,16 +13,19 @@ from action_sheet_align import (  # noqa: E402
     ASSETS,
     RAW,
     crop_alpha,
+    expand_jump_up_down,
     plant_poses,
     run_ruler_cell,
     run_target_height,
     save_singles,
     uniform_scale_poses,
     write_bookend_sheet,
+    write_pose_grid,
 )
 from import_jump_roll_sheets import split_cells  # noqa: E402
 
 NAMES = ("jump-ant", "jump", "fly", "jump-land")
+ART_SHEETS = Path(__file__).resolve().parent / "art-sheets"
 
 
 def main() -> None:
@@ -52,12 +55,20 @@ def main() -> None:
     print(f"sheet_k={sheet_k:.4f} sizes={[p.size for p in poses]}")
 
     planted = plant_poses(poses)
-    save_singles(cid, NAMES, planted)
-    write_bookend_sheet(
+    save_singles(cid, NAMES, planted)  # 调试散帧；局内真源是宫格
+    action = expand_jump_up_down(*planted)
+    seq = [ruler, *action, ruler]
+    write_pose_grid(
         ASSETS / "mage-jump-sheet.png",
+        seq,
+        cols=3,
+        rows=3,
+        raw_aligned=RAW / "mage-jump-sheet-aligned.png",
+    )
+    write_bookend_sheet(
+        ART_SHEETS / "mage-jump-sheet.png",
         planted,
         ruler,
-        raw_aligned=RAW / "mage-jump-sheet-aligned.png",
         cols_meta=RAW / "mage-jump-sheet.cols",
     )
 

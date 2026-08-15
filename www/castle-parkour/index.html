@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="color-scheme" content="dark" />
   <title>古堡跑酷</title>
-  <script src="js/boot-mobile.js?v=20260816z"></script>
-  <link rel="stylesheet" href="css/app.css?v=20260816z" />
+  <script src="js/boot-mobile.js?v=20260819d"></script>
+  <link rel="stylesheet" href="css/app.css?v=20260819d" />
 </head>
 <body>
   <div id="boot-loading" class="boot-loading" aria-live="polite" aria-busy="true" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
@@ -39,7 +39,7 @@
           </div>
         </div>
         <div class="menu-actions">
-        <button class="primary" id="menu-start">开始游戏</button>
+          <button class="primary" id="menu-start">开始游戏</button>
           <button class="attr" id="menu-char" type="button">角色</button>
           <button class="stats" id="menu-shop" type="button">道具商店</button>
           <button class="stats" id="menu-stats" type="button">统计</button>
@@ -60,10 +60,18 @@
         <div class="chip score">距离<b id="score">0</b><small>m</small></div>
         <div class="chip gold">金币<b id="hud-gold">0</b></div>
         <div class="chip score-val">分数<b id="hud-score">0</b></div>
-        <div class="chip best">最高<b id="best">0</b><small>m</small></div>
+        <div class="chip best">最远<b id="best">0</b><small>m</small></div>
       </div>
       <div class="tips">
-        <kbd>W</kbd>/<kbd>↑</kbd>/<kbd>空格</kbd> 跳跃（空中可二段跳） &nbsp;<kbd>S</kbd>/<kbd>↓</kbd> 翻滚 &nbsp;<kbd>J</kbd>/鼠标左键 攻击（法师耗能量） &nbsp;<kbd>1-4</kbd> 道具 &nbsp;<kbd>空格</kbd>/回车/按钮 开始·重开 &nbsp;<kbd>F</kbd> 全屏 &nbsp;<kbd>M</kbd> 静音 &nbsp;<kbd>P</kbd> 性能监控 &nbsp;<kbd>Esc</kbd> 返回
+        <kbd>W</kbd>/<kbd>↑</kbd>/<kbd>空格</kbd> 跳跃（空中可二段跳）
+        &nbsp;<kbd>S</kbd>/<kbd>↓</kbd> 翻滚
+        &nbsp;<kbd>J</kbd>/鼠标左键 攻击（法师耗能量）
+        &nbsp;<kbd>1-4</kbd> 道具
+        &nbsp;<kbd>空格</kbd>/回车/按键 开始·重开
+        &nbsp;<kbd>F</kbd> 全屏
+        &nbsp;<kbd>M</kbd> 静音
+        &nbsp;<kbd>P</kbd> 性能监控
+        &nbsp;<kbd>Esc</kbd> 返回
       </div>
       <div class="item-equip" id="item-equip"></div>
       <div class="btn-row">
@@ -86,7 +94,7 @@
       <div class="panel">
         <h2>统计</h2>
         <div class="stat-row"><span>最远距离</span><b id="st-best">0</b><small>m</small></div>
-        <div class="stat-row"><span>游玩次数</span><b id="st-plays">0</b></div>
+        <div class="stat-row"><span>游戏次数</span><b id="st-plays">0</b></div>
         <div class="stat-row"><span>累计时长</span><b id="st-time">0 秒</b></div>
       </div>
       <div class="dots-row"><i class="d1"></i><i class="d2"></i><i class="d3"></i><i class="d4"></i><i class="d5"></i></div>
@@ -104,16 +112,16 @@
           <div class="char-tabs">
             <button type="button" class="char-tab active" id="tab-mage">法师</button>
             <button type="button" class="char-tab" id="tab-warrior">战士</button>
-        </div>
+          </div>
           <div id="char-buy-warrior" class="char-buy-banner" hidden>
             <div>战士尚未解锁</div>
             <button type="button" id="buy-warrior-char">购买战士 · 800 金</button>
-        </div>
+          </div>
           <div class="char-select-row">
             <button type="button" id="char-equip-btn">选为出战角色</button>
-        </div>
+          </div>
           <div id="char-upgrades"></div>
-      </div>
+        </div>
       </div>
       <button class="back" id="char-back">返回</button>
     </div>
@@ -124,22 +132,38 @@
         <div class="gold-bar">金币 <b id="shop-gold">0</b></div>
         <div class="shop-card" id="shop-card-magnet">
           <div class="icon-big">🧲</div>
-          <div class="meta"><div class="name">磁铁</div><div class="desc">10秒内吸引附近金币</div><div class="owned">拥有 <span id="shop-owned-magnet">0</span></div></div>
+          <div class="meta">
+            <div class="name">磁铁</div>
+            <div class="desc">10秒内吸引附近金币</div>
+            <div class="owned">拥有 <span id="shop-owned-magnet">0</span></div>
+          </div>
           <button id="buy-magnet">购买 100 金</button>
         </div>
         <div class="shop-card" id="shop-card-shield">
           <div class="icon-big">🛡</div>
-          <div class="meta"><div class="name">护盾</div><div class="desc">获得1层充能，受致命伤或掉坑时触发起飞</div><div class="owned">拥有 <span id="shop-owned-shield">0</span></div></div>
+          <div class="meta">
+            <div class="name">护盾</div>
+            <div class="desc">获得1层充能，受致命伤或掉坑时触发起飞</div>
+            <div class="owned">拥有 <span id="shop-owned-shield">0</span></div>
+          </div>
           <button id="buy-shield">购买 150 金</button>
         </div>
         <div class="shop-card" id="shop-card-double">
           <div class="icon-big">💰</div>
-          <div class="meta"><div class="name">双倍金币</div><div class="desc">本局金币拾取翻倍</div><div class="owned">拥有 <span id="shop-owned-double">0</span></div></div>
+          <div class="meta">
+            <div class="name">双倍金币</div>
+            <div class="desc">本局金币拾取翻倍</div>
+            <div class="owned">拥有 <span id="shop-owned-double">0</span></div>
+          </div>
           <button id="buy-double">购买 250 金</button>
         </div>
         <div class="shop-card" id="shop-card-revive">
-          <div class="icon-big">❤</div>
-          <div class="meta"><div class="name">复活币</div><div class="desc">死亡后原地复活，恢复满血</div><div class="owned">拥有 <span id="shop-owned-revive">0</span></div></div>
+          <div class="icon-big">❤️</div>
+          <div class="meta">
+            <div class="name">复活币</div>
+            <div class="desc">死亡后原地复活，恢复满血</div>
+            <div class="owned">拥有 <span id="shop-owned-revive">0</span></div>
+          </div>
           <button id="buy-revive">购买 400 金</button>
         </div>
       </div>
@@ -149,7 +173,7 @@
 
     <div id="screen-exit" class="screen">
       <div class="exit-box">
-        <div class="big">★</div>
+        <div class="big">🌙</div>
         <div class="title-wrap"><div class="title">感谢游玩</div></div>
         <p>已退出古堡跑酷，欢迎再来</p>
         <button class="back" id="exit-back">返回主界面</button>
@@ -180,6 +204,6 @@
     </div>
 
   </div>
-  <script type="module" src="js/main.js?v=20260816z"></script>
+  <script type="module" src="js/main.js?v=20260819d"></script>
 </body>
 </html>

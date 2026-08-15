@@ -1,8 +1,8 @@
 (() => {
   const BUILD_KEY = 'cp-build-id';
   const RELOAD_KEY = 'cp-build-reloading';
-  /** 与 build-id.txt / ASSET_VER 同步 */
-  const EMBEDDED_BUILD = '20260816z';
+  /** ? build-id.txt / ASSET_VER ?? */
+  const EMBEDDED_BUILD = '20260819d';
 
   const detectMobileUi = () => {
     if (navigator.userAgentData?.mobile === true) return true;
@@ -24,7 +24,7 @@
     document.documentElement.classList.add('assets-pending');
   };
 
-  /** 仅在确认有新版本时调用；无更新绝不清缓存 */
+  /** ???????????????????? */
   const clearSiteCaches = async () => {
     try {
       if (navigator.serviceWorker?.getRegistrations) {

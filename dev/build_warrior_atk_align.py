@@ -16,29 +16,30 @@ from action_sheet_align import (  # noqa: E402
     RAW,
     crop_alpha,
     plant_poses,
+    resolve_single,
     run_ruler_cell,
     run_target_height,
     save_singles,
     uniform_scale_poses,
     write_bookend_sheet,
+    write_pose_grid_bookends,
 )
 
 SINGLE_NAMES = ("atk-wind", "atk")
 CID = "warrior"
+ART_SHEETS = Path(__file__).resolve().parent / "art-sheets"
 
 
 def main() -> None:
     if not (ASSETS / f"{CID}-run-sheet.png").exists():
         raise SystemExit(f"missing {CID}-run-sheet.png")
 
-    srcs = [ASSETS / f"{CID}-{n}.png" for n in SINGLE_NAMES]
-    # 优先 art-raw keyed；否则用 assets 旧散帧重对齐
-    raw_alts = [RAW / f"{CID}-{n}.png" for n in SINGLE_NAMES]
     poses0 = []
-    for alt, asset in zip(raw_alts, srcs):
-        path = alt if alt.exists() else asset
-        if not path.exists():
-            raise SystemExit(f"missing {path}")
+    for n in SINGLE_NAMES:
+        try:
+            path = resolve_single(CID, n)
+        except FileNotFoundError as e:
+            raise SystemExit(f"missing {e}") from e
         poses0.append(crop_alpha(Image.open(path).convert("RGBA")))
 
     h_run = run_target_height(CID)
@@ -50,11 +51,18 @@ def main() -> None:
 
     planted = plant_poses(poses)
     save_singles(CID, SINGLE_NAMES, planted)
-    write_bookend_sheet(
+    write_pose_grid_bookends(
         ASSETS / "warrior-atk-sheet.png",
         planted,
         ruler,
+        cols=2,
+        rows=2,
         raw_aligned=RAW / "warrior-atk-sheet-aligned.png",
+    )
+    write_bookend_sheet(
+        ART_SHEETS / "warrior-atk-sheet.png",
+        planted,
+        ruler,
         cols_meta=RAW / "warrior-atk-sheet.cols",
     )
 

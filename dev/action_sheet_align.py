@@ -22,6 +22,17 @@ MARGIN = 16
 DEV = Path(__file__).resolve().parent
 ASSETS = DEV.parent / "www" / "castle-parkour" / "assets"
 RAW = DEV / "art-raw"
+SINGLES = RAW / "singles"
+
+
+def resolve_single(cid: str, name: str) -> Path:
+    """散帧查找顺序：art-raw/singles → art-raw → assets（兼容旧路径）。"""
+    fname = f"{cid}-{name}.png"
+    for base in (SINGLES, RAW, ASSETS):
+        p = base / fname
+        if p.exists():
+            return p
+    raise FileNotFoundError(fname)
 
 
 def crop_alpha(im: Image.Image) -> Image.Image:
@@ -41,17 +52,27 @@ def scale_uniform(im: Image.Image, k: float) -> Image.Image:
     return im.resize((nw, nh), Image.Resampling.BICUBIC)
 
 
+def iter_run_cells(im: Image.Image):
+    """遍历跑步表各格（支持 1×N 横条或 4×4 宫格）。"""
+    cols = max(1, im.width // CW)
+    rows = max(1, im.height // CH)
+    for r in range(rows):
+        for c in range(cols):
+            yield im.crop((c * CW, r * CH, (c + 1) * CW, (r + 1) * CH))
+
+
 def run_target_height(cid: str) -> int:
-    """跑步表各格 content 高度中位数。"""
+    """跑步表各格 content 高度中位数（跳过空格）。"""
     run_path = ASSETS / f"{cid}-run-sheet.png"
     im = Image.open(run_path).convert("RGBA")
-    cols = max(1, im.width // CW)
     hs: list[int] = []
-    for i in range(cols):
-        cell = im.crop((i * CW, 0, (i + 1) * CW, min(CH, im.height)))
+    for cell in iter_run_cells(im):
         box = content_box(np.array(cell))
-        if box:
-            hs.append(box[3] - box[1])
+        if not box:
+            continue
+        h = box[3] - box[1]
+        if h < CH * 0.92:  # 空格常被测成满格
+            hs.append(h)
     if not hs:
         raise SystemExit(f"no content in {run_path}")
     hs.sort()
@@ -62,11 +83,15 @@ def run_ruler_cell(cid: str, idx: int = 3) -> Image.Image:
     """取跑步表一格作尺度参考（不是立绘）。"""
     run_path = ASSETS / f"{cid}-run-sheet.png"
     im = Image.open(run_path).convert("RGBA")
-    cols = max(1, im.width // CW)
-    idx = max(0, min(cols - 1, idx))
-    cell = im.crop((idx * CW, 0, (idx + 1) * CW, im.height))
-    if cell.height != CH:
-        return plant(crop_alpha(cell), CW, CH, FOOT, margin=MARGIN)
+    cells = []
+    for cell in iter_run_cells(im):
+        box = content_box(np.array(cell))
+        if box and (box[3] - box[1]) < CH * 0.92:
+            cells.append(cell)
+    if not cells:
+        raise SystemExit(f"no run frames in {run_path}")
+    idx = max(0, min(len(cells) - 1, idx))
+    cell = cells[idx]
     if cell.size != (CW, CH):
         out = Image.new("RGBA", (CW, CH), (0, 0, 0, 0))
         out.paste(cell, (0, 0))
@@ -110,6 +135,157 @@ def plant_poses(poses: list[Image.Image]) -> list[Image.Image]:
     return [plant(p, CW, CH, FOOT, margin=MARGIN) for p in poses]
 
 
+def lerp_cell(a: Image.Image, b: Image.Image, t: float) -> Image.Image:
+    """RGBA 像素插值（同尺寸格），作姿态衔接。"""
+    t = max(0.0, min(1.0, float(t)))
+    aa = np.asarray(a.convert("RGBA"), dtype=np.float32)
+    bb = np.asarray(b.convert("RGBA"), dtype=np.float32)
+    if aa.shape != bb.shape:
+        raise SystemExit(f"lerp size mismatch {aa.shape} vs {bb.shape}")
+    out = aa * (1.0 - t) + bb * t
+    return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), "RGBA")
+
+
+def pad_with_lerps(poses: list[Image.Image], target: int) -> list[Image.Image]:
+    """在相邻姿态间插入 lerp，补到 target；只补不减。"""
+    if target < 1:
+        raise SystemExit("pad target < 1")
+    if not poses:
+        raise SystemExit("no poses to pad")
+    if len(poses) >= target:
+        return list(poses)
+    if len(poses) == 1:
+        return [poses[0].copy() for _ in range(target)]
+    need = target - len(poses)
+    gaps = len(poses) - 1
+    per_gap = [0] * gaps
+    for i in range(need):
+        per_gap[i % gaps] += 1
+    out: list[Image.Image] = [poses[0]]
+    for g in range(gaps):
+        a, b = poses[g], poses[g + 1]
+        n = per_gap[g]
+        for k in range(1, n + 1):
+            out.append(lerp_cell(a, b, k / (n + 1)))
+        out.append(b)
+    assert len(out) == target, f"pad want {target} got {len(out)}"
+    return out
+
+
+def pad_with_holds(poses: list[Image.Image], target: int) -> list[Image.Image]:
+    """用已有姿态复用/停顿补到 target；无像素残影。只补不减。"""
+    if target < 1:
+        raise SystemExit("pad target < 1")
+    if not poses:
+        raise SystemExit("no poses to pad")
+    if len(poses) >= target:
+        return list(poses)
+    if len(poses) == 1:
+        return [poses[0].copy() for _ in range(target)]
+    # 优先在「上升/腾空」段加长：中间姿态多停几拍
+    out = list(poses)
+    # 从靠近中段的姿势开始复制
+    mid = max(0, len(poses) // 2)
+    i = 0
+    while len(out) < target:
+        src = out[min(mid + (i % max(1, len(poses) - mid)), len(out) - 1)]
+        # 插在 mid 之后，拉长腾空
+        insert_at = min(len(out) - 1, mid + 1 + i)
+        out.insert(insert_at, src.copy())
+        i += 1
+    return out[:target]
+
+
+def expand_jump_up_down(
+    ant: Image.Image,
+    jump: Image.Image,
+    fly: Image.Image,
+    land: Image.Image,
+) -> list[Image.Image]:
+    """跳跃 7 动作帧（真姿态，无残影）：
+
+    起跳：蓄力(ant) → 离地(jump) → 上升(jump)
+    腾空：顶点(fly) → 下落(fly)
+    落地：着地(land) → 起身衔接(ant，接回跑步尺)
+    """
+    return [
+        ant.copy(),
+        jump.copy(),
+        jump.copy(),
+        fly.copy(),
+        fly.copy(),
+        land.copy(),
+        ant.copy(),
+    ]
+
+
+def nearest_grid_count(n: int) -> int:
+    """对齐到 4 / 9 / 16（只升不降）。"""
+    for t in (4, 9, 16):
+        if n <= t:
+            return t
+    raise SystemExit(f"frame count {n} > 16; split sheet first")
+
+
+def write_pose_grid(
+    dest: Path,
+    planted: list[Image.Image],
+    *,
+    cols: int = 2,
+    rows: int = 2,
+    raw_aligned: Path | None = None,
+) -> tuple[int, int]:
+    """动作帧打成宫格。返回 (cols, rows)。"""
+    out = Image.new("RGBA", (CW * cols, CH * rows), (0, 0, 0, 0))
+    for i, cell in enumerate(planted):
+        if i >= cols * rows:
+            break
+        row, col = divmod(i, cols)
+        out.paste(cell, (col * CW, row * CH))
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    out.save(dest)
+    if raw_aligned is not None:
+        raw_aligned.parent.mkdir(parents=True, exist_ok=True)
+        out.save(raw_aligned)
+    print(f"wrote {dest} grid={cols}x{rows} frames={min(len(planted), cols * rows)}")
+    return cols, rows
+
+
+def write_pose_grid_bookends(
+    dest: Path,
+    planted: list[Image.Image],
+    ruler: Image.Image,
+    *,
+    cols: int | None = None,
+    rows: int | None = None,
+    raw_aligned: Path | None = None,
+    pad_to: int | None = None,
+    pad_mode: str = "hold",
+) -> int:
+    """首尾跑步参考 + 动作帧 → 宫格（局内播放跳过首尾）。返回 frameCount。
+
+    pad_to: 对齐到 4/9/16（只补）；pad_mode=hold 复用真帧，lerp 仅特殊需要。
+    """
+    action = list(planted)
+    total_raw = len(action) + 2
+    target = pad_to if pad_to is not None else nearest_grid_count(total_raw)
+    action_n = target - 2
+    if len(action) > action_n:
+        raise SystemExit(f"action frames {len(action)} > slot {action_n} (不可减)")
+    if len(action) < action_n:
+        if pad_mode == "lerp":
+            action = pad_with_lerps(action, action_n)
+        else:
+            action = pad_with_holds(action, action_n)
+    seq = [ruler, *action, ruler]
+    if cols is None or rows is None:
+        side = 3 if target == 9 else (2 if target == 4 else 4)
+        cols = rows = side
+    write_pose_grid(dest, seq, cols=cols, rows=rows, raw_aligned=raw_aligned)
+    print(f"  bookends=run frameCount={len(seq)} grid={cols}x{rows} pad={pad_mode}")
+    return len(seq)
+
+
 def write_bookend_sheet(
     dest: Path,
     planted: list[Image.Image],
@@ -135,9 +311,11 @@ def write_bookend_sheet(
 
 
 def save_singles(cid: str, names: tuple[str, ...], planted: list[Image.Image]) -> None:
+    """调试散帧写入 art-raw/singles/（局内不加载）。"""
+    SINGLES.mkdir(parents=True, exist_ok=True)
     for name, cell in zip(names, planted):
-        dest = ASSETS / f"{cid}-{name}.png"
+        dest = SINGLES / f"{cid}-{name}.png"
         cell.save(dest)
         box = content_box(np.array(cell))
         wh = f"{(box[2]-box[0]) if box else 0}x{(box[3]-box[1]) if box else 0}"
-        print(f"  wrote {dest.name} content={wh}")
+        print(f"  wrote singles/{dest.name} content={wh}")

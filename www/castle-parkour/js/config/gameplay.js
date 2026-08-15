@@ -35,9 +35,11 @@ export const ORBIT_R = 42;
 export const ORBIT_SHOOT_CD = 0.36;
 export const ORBIT_SEEK_RANGE = 280;
 
-export const BAT_W = 34;
-export const BAT_H = 26;
-export const BAT_EXTRA_VX = 12;
+export const BAT_W = 42;
+export const BAT_H = 32;
+export const BAT_EXTRA_VX = 75;
+/** 相对角色的额外追击速度（向左飞向 CHAR_X） */
+export const BAT_CHASE_VX = 55;
 /** 蝙蝠固定第二层高度（画布 Y：二级台顶上方 24px） */
 export const BAT_Y = GROUND - 2 * U - 24;
 
@@ -50,8 +52,14 @@ export const FAST_FALL_V = 1200;
 
 export const COIN_R = 14;
 export const COIN_VALUE = 5;
-export const COIN_PICKUP_R = 48;
 export const COIN_DRAW_H = 28;
+/** 磁铁吸引：每帧按剩余距离比例追赶（越大越快），另加最低速度 */
+export const MAGNET_CATCH_RATE = 28;
+export const MAGNET_CATCH_RATE_FLY = 36;
+export const MAGNET_PULL_MIN = 1600;
+export const MAGNET_PULL_MIN_FLY = 2400;
+/** 磁铁吸引半径（普通 / 起飞统一） */
+export const MAGNET_PULL_R = 500;
 
 export const PX_PER_METER = 26;
 export const KILL_GOLD = 10;
@@ -70,14 +78,23 @@ export const LAYER_H = U;
 export const LAYER2_TOP = 2 * LAYER_H;
 /** 二级台脚底离地高（与 LAYER2_TOP 同） */
 export const PLATFORM_H = 80;
-/** 三级台脚底离地高 */
-export const PLATFORM_H3 = 120;
+/** 三级台脚底离地高 = 二级再叠一层（与二级→地面同高差） */
+export const PLATFORM_H3 = PLATFORM_H * 2;
 /** 二级台长：局内宽一半（VIEW.W=800） */
 export const PLATFORM_W_HALF = 400;
 /** 二级台长 / 三级台长：局内宽三分之一 */
 export const PLATFORM_W_THIRD = 267;
 /** 半长二级台末六分之一，三级台叠在这段起点上 */
 export const PLATFORM_L2_TAIL = 67;
+/**
+ * 高台「结构」之间的世界间距（避免同屏两座粘连；也不要隔太久才出一座）。
+ * 屏宽 VIEW.W=800。
+ */
+export const ELEV_STRUCT_MIN_GAP = VIEW.W + 40;
+export const ELEV_STRUCT_SOFT_GAP = VIEW.W + 200;
+/** 高台怪：最高台终点(x1) 右偏 / 相对台面抬高（真源 gameplay.js） */
+export const PLAT_MONSTER_DX = 80;
+export const PLAT_MONSTER_ABOVE = 100;
 
 export const SPIKE_H = 0.75 * U;
 export const SPIKE_W = 52;

@@ -19,10 +19,12 @@ from action_sheet_align import (  # noqa: E402
     save_singles,
     uniform_scale_poses,
     write_bookend_sheet,
+    write_pose_grid_bookends,
 )
 from import_jump_roll_sheets import split_cells  # noqa: E402
 
 SINGLE_NAMES = ("atk-wind", "atk")
+ART_SHEETS = Path(__file__).resolve().parent / "art-sheets"
 
 
 def main() -> None:
@@ -44,17 +46,23 @@ def main() -> None:
         raise SystemExit(f"need ≥2 atk poses, got {len(cells)}")
 
     poses0 = [crop_alpha(c) for c in cells]
-    # 攻击偏站立 ≈ 跑步高 95%
     poses, sheet_k = uniform_scale_poses(poses0, h_run=h_run, anchor_ratio=0.95)
     print(f"sheet_k={sheet_k:.4f} n={len(poses)} sizes={[p.size for p in poses]}")
 
-    planted = plant_poses(poses)
+    planted = plant_poses(poses[:2])
     save_singles(cid, SINGLE_NAMES, planted)
-    write_bookend_sheet(
+    write_pose_grid_bookends(
         ASSETS / "mage-atk-sheet.png",
         planted,
         ruler,
+        cols=2,
+        rows=2,
         raw_aligned=RAW / "mage-atk-sheet-aligned.png",
+    )
+    write_bookend_sheet(
+        ART_SHEETS / "mage-atk-sheet.png",
+        planted,
+        ruler,
         cols_meta=RAW / "mage-atk-sheet.cols",
     )
 

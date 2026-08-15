@@ -17,17 +17,20 @@ from action_sheet_align import (  # noqa: E402
     ASSETS,
     RAW,
     crop_alpha,
+    expand_jump_up_down,
     plant_poses,
     run_ruler_cell,
     run_target_height,
     save_singles,
     uniform_scale_poses,
     write_bookend_sheet,
+    write_pose_grid,
 )
 from import_jump_roll_sheets import split_cells_equal_reconnected  # noqa: E402
 
 NAMES = ("jump-ant", "jump", "fly", "jump-land")
 CID = "warrior"
+ART_SHEETS = Path(__file__).resolve().parent / "art-sheets"
 
 
 def main() -> None:
@@ -41,7 +44,6 @@ def main() -> None:
     ruler = run_ruler_cell(CID, idx=3)
     print(f"h_run={h_run} (run content median — scale ruler)")
 
-    # soft key already done by chroma; reconnect body islands (no hard key / keep_local)
     cells = split_cells_equal_reconnected(src, cols=4, hard_magenta=False, close_rad=4)
     if len(cells) != 4:
         raise SystemExit(f"need 4 jump poses, got {len(cells)}")
@@ -58,11 +60,19 @@ def main() -> None:
 
     planted = plant_poses(poses)
     save_singles(CID, NAMES, planted)
-    write_bookend_sheet(
+    action = expand_jump_up_down(*planted)
+    seq = [ruler, *action, ruler]
+    write_pose_grid(
         ASSETS / "warrior-jump-sheet.png",
+        seq,
+        cols=3,
+        rows=3,
+        raw_aligned=RAW / "warrior-jump-sheet-aligned.png",
+    )
+    write_bookend_sheet(
+        ART_SHEETS / "warrior-jump-sheet.png",
         planted,
         ruler,
-        raw_aligned=RAW / "warrior-jump-sheet-aligned.png",
         cols_meta=RAW / "warrior-jump-sheet.cols",
     )
 

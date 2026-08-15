@@ -264,15 +264,20 @@ def scale_uniform(im: Image.Image, k: float) -> Image.Image:
 
 
 def run_target_height(run_path: Path) -> int:
-    """跑步表内容高度中位数。"""
+    """跑步表内容高度中位数（支持 1×N / 4×4）。"""
     im = Image.open(run_path).convert("RGBA")
     cols = max(1, im.width // CW)
+    rows = max(1, im.height // CH)
     hs = []
-    for i in range(cols):
-        cell = im.crop((i * CW, 0, (i + 1) * CW, min(CH, im.height)))
-        box = content_box(np.array(cell))
-        if box:
-            hs.append(box[3] - box[1])
+    for r in range(rows):
+        for c in range(cols):
+            cell = im.crop((c * CW, r * CH, (c + 1) * CW, (r + 1) * CH))
+            box = content_box(np.array(cell))
+            if not box:
+                continue
+            h = box[3] - box[1]
+            if h < CH * 0.92:
+                hs.append(h)
     if not hs:
         raise SystemExit(f"no content in run sheet {run_path}")
     hs.sort()
@@ -280,16 +285,22 @@ def run_target_height(run_path: Path) -> int:
 
 
 def run_ruler_cell(run_path: Path, idx: int = 3) -> Image.Image:
-    """直接取跑步表一格作尺（不是立绘）。"""
+    """直接取跑步表一格作尺（不是立绘）；支持宫格。"""
     im = Image.open(run_path).convert("RGBA")
     cols = max(1, im.width // CW)
-    idx = max(0, min(cols - 1, idx))
-    rh = im.height
-    cell = im.crop((idx * CW, 0, (idx + 1) * CW, rh))
-    if rh != CH:
-        # 对齐到本表画布：按内容重贴地
-        return plant_ground(crop_alpha(cell))
-    if cell.height != CH:
+    rows = max(1, im.height // CH)
+    cells = []
+    for r in range(rows):
+        for c in range(cols):
+            cell = im.crop((c * CW, r * CH, (c + 1) * CW, (r + 1) * CH))
+            box = content_box(np.array(cell))
+            if box and (box[3] - box[1]) < CH * 0.92:
+                cells.append(cell)
+    if not cells:
+        raise SystemExit(f"no run frames in {run_path}")
+    idx = max(0, min(len(cells) - 1, idx))
+    cell = cells[idx]
+    if cell.size != (CW, CH):
         out = Image.new("RGBA", (CW, CH), (0, 0, 0, 0))
         out.paste(cell, (0, 0))
         return out
@@ -300,6 +311,15 @@ def load_pose(path: Path) -> Image.Image:
     if not path.exists():
         raise SystemExit(f"missing {path}")
     return crop_alpha(Image.open(path).convert("RGBA"))
+
+
+def lerp_cell(a: Image.Image, b: Image.Image, t: float) -> Image.Image:
+    """RGBA 像素插值（同尺寸格），作姿态衔接，不改成球 lock。"""
+    t = max(0.0, min(1.0, float(t)))
+    aa = np.asarray(a.convert("RGBA"), dtype=np.float32)
+    bb = np.asarray(b.convert("RGBA"), dtype=np.float32)
+    out = aa * (1.0 - t) + bb * t
+    return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), "RGBA")
 
 
 def main() -> None:
@@ -363,31 +383,48 @@ def main() -> None:
     if dust is not None:
         dust = fit_once(dust, max(28, lock // 4))
 
-    angles = (0, -60, -120, -180, -240, -300)
+    # 前滚翻顺时针（PIL 负角）。
+    # 起转：俯冲后接「头在球底」约 -120°（旧表第 6 帧）。
+    # 收转：第 12 格 = -360°（旧第 12 帧）；13–14 = 球→起身像素衔接；15 = 起身。
+    # 16 格：run | tuck | dive | spin×9 | lerp×2 | unroll | run；成球 lock 不变。
+    spin_start = -120.0
+    spin_end = -360.0
+    spin_n = 9
+    spin_step = (spin_end - spin_start) / (spin_n - 1)  # -30°
+    unroll_cell = stamp_dust(plant_ground(unroll), dust)
     action = [
         stamp_dust(plant_ground(tuck), dust),
         stamp_dust(plant_ground(dive), dust),
     ]
-    for ang in angles:
+    for i in range(spin_n):
+        ang = spin_start + i * spin_step
         action.append(stamp_dust(ball_spin_cell(ball, float(ang), lock), dust))
-    action.append(stamp_dust(plant_ground(unroll), dust))
+    exit_ball = action[-1]
+    action.append(lerp_cell(exit_ball, unroll_cell, 0.34))
+    action.append(lerp_cell(exit_ball, unroll_cell, 0.67))
+    action.append(unroll_cell)
 
     seq = [ruler, *action, ruler]
+    assert len(seq) == 16, f"want 16 got {len(seq)}"
 
     n = len(seq)
-    out = Image.new("RGBA", (CW * n, CH), (0, 0, 0, 0))
     for i, cell in enumerate(seq):
-        out.paste(cell, (i * CW, 0))
         box = content_box(np.array(cell))
         h = (box[3] - box[1]) if box else 0
         foot_gap = (CH - 1 - box[3]) if box else -1
         tag = "runRef" if i in (0, n - 1) else "action"
         print(f"  [{i}] {tag} {(box[2]-box[0]) if box else 0}x{h} footGap={foot_gap}")
+
     dest = ASSETS / "mage-roll-sheet.png"
-    out.save(dest)
+    grid = Image.new("RGBA", (CW * 4, CH * 4), (0, 0, 0, 0))
+    for i, cell in enumerate(seq):
+        row, col = divmod(i, 4)
+        grid.paste(cell, (col * CW, row * CH))
+    grid.save(dest)
     (RAW / "mage-roll-sheet.cols").write_text(f"{n}\n", encoding="utf-8")
-    out.save(RAW / "mage-roll-sheet-spun.png")
-    print(f"wrote {dest} cols={n} (bookends=run frames)")
+    (RAW / "mage-roll-sheet.grid").write_text("4x4\n", encoding="utf-8")
+    grid.save(RAW / "mage-roll-sheet-spun.png")
+    print(f"wrote {dest} grid=4x4 frameCount={n} spin={spin_start}→{spin_end}×{spin_n} +lerp×2 lock={lock}")
 
 
 if __name__ == "__main__":

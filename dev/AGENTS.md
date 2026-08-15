@@ -2,9 +2,11 @@
 
 | 区域 | 路径 |
 |------|------|
-| 单文件游戏 | `www/castle-parkour/index.html` |
-| 静态资源 | `www/castle-parkour/assets/` |
-| 开发说明 | `dev/docs/dev.md` |
+| 游戏壳 | `www/castle-parkour/`（`index.html` + `js/` + `css/`） |
+| 局内贴图真源 | `www/castle-parkour/assets/`（sheet / 立绘 / 世界物） |
+| 资源清单 | `www/castle-parkour/ASSETS.md` |
+| 美术管线 | `dev/README.md` + `dev/*.py` |
+| 散帧调试 | `dev/art-raw/singles/`（局内不加载） |
 
 挂载 `/castle-parkour`；无构建步骤。
 

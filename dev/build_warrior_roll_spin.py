@@ -35,6 +35,7 @@ from build_mage_roll_spin import (  # noqa: E402
     content_box,
     extract_dust,
     fit_once,
+    lerp_cell,
     plant_ground,
     stamp_dust,
 )
@@ -99,30 +100,43 @@ def main() -> None:
     if dust is not None:
         dust = fit_once(dust, max(28, lock // 4))
 
-    angles = (0, -60, -120, -180, -240, -300)
+    # 同法师：第 12 格收 -360° → lerp×2 → unroll；lock 不变
+    spin_start = -120.0
+    spin_end = -360.0
+    spin_n = 9
+    spin_step = (spin_end - spin_start) / (spin_n - 1)
+    unroll_cell = stamp_dust(plant_ground(unroll), dust)
     action = [
         stamp_dust(plant_ground(tuck), dust),
         stamp_dust(plant_ground(dive), dust),
     ]
-    for ang in angles:
+    for i in range(spin_n):
+        ang = spin_start + i * spin_step
         action.append(stamp_dust(ball_spin_cell(ball, float(ang), lock), dust))
-    action.append(stamp_dust(plant_ground(unroll), dust))
+    exit_ball = action[-1]
+    action.append(lerp_cell(exit_ball, unroll_cell, 0.34))
+    action.append(lerp_cell(exit_ball, unroll_cell, 0.67))
+    action.append(unroll_cell)
 
     seq = [ruler, *action, ruler]
+    assert len(seq) == 16, f"want 16 got {len(seq)}"
     n = len(seq)
-    out = Image.new("RGBA", (CW * n, CH), (0, 0, 0, 0))
     for i, cell in enumerate(seq):
-        out.paste(cell, (i * CW, 0))
         box = content_box(np.array(cell))
         h = (box[3] - box[1]) if box else 0
         tag = "runRef" if i in (0, n - 1) else "action"
         print(f"  [{i}] {tag} {(box[2]-box[0]) if box else 0}x{h}")
 
     dest = ASSETS / "warrior-roll-sheet.png"
-    out.save(dest)
+    grid = Image.new("RGBA", (CW * 4, CH * 4), (0, 0, 0, 0))
+    for i, cell in enumerate(seq):
+        row, col = divmod(i, 4)
+        grid.paste(cell, (col * CW, row * CH))
+    grid.save(dest)
     (RAW / "warrior-roll-sheet.cols").write_text(f"{n}\n", encoding="utf-8")
-    out.save(RAW / "warrior-roll-sheet-spun.png")
-    print(f"wrote {dest} cols={n} play={n - 2} (bookends=run, spin=6)")
+    (RAW / "warrior-roll-sheet.grid").write_text("4x4\n", encoding="utf-8")
+    grid.save(RAW / "warrior-roll-sheet-spun.png")
+    print(f"wrote {dest} grid=4x4 frameCount={n} spin={spin_start}→{spin_end}×{spin_n} +lerp×2 lock={lock}")
 
 
 if __name__ == "__main__":
