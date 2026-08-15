@@ -5531,33 +5531,54 @@ function notifyGameplayReady() {
   }
 }
 
+function sheetAssetReady(sheet) {
+  return !!(sheet?.ready && sheet.img?.width > 0 && (sheet.frames?.length || sheet.cols || sheet.rows));
+}
+
+/** 开局最低要求：出战角色 跑/滚/跳/攻 sheet 齐（否则跳攻会「没了」） */
+function primaryMotionSheetsReady() {
+  const id = selectedChar === 'warrior' ? 'warrior' : 'mage';
+  return [
+    CHAR_RUN_SHEETS[id],
+    CHAR_ROLL_SHEETS[id],
+    CHAR_JUMP_SHEETS[id],
+    CHAR_ATK_SHEETS[id],
+  ].every(sheetAssetReady);
+}
+
+function primaryRunSheetReady() {
+  return primaryMotionSheetsReady();
+}
+
+function ensurePrimaryMotionSheets(onProgress) {
+  const sheets = listCriticalGameplayAssets();
+  let left = 0;
+  for (const a of sheets) {
+    if (!a || sheetAssetReady(a)) continue;
+    left += 1;
+    a.failed = false;
+    a._loading = false;
+    if (!a.ready) a.img = null;
+    loadImageAsset(a, () => {
+      left -= 1;
+      onProgress?.();
+      if (left <= 0) tryNotifyGameplayReady();
+    });
+  }
+  if (left === 0) tryNotifyGameplayReady();
+}
+
 function whenGameplayReady() {
-  if (gameplayReady && primaryRunSheetReady()) return Promise.resolve();
+  if (gameplayReady && primaryMotionSheetsReady()) return Promise.resolve();
   gameplayReady = false;
   return new Promise((resolve) => {
     gameplayWaiters.push(resolve);
-    const id = selectedChar === 'warrior' ? 'warrior' : 'mage';
-    const run = CHAR_RUN_SHEETS[id];
-    if (run && !primaryRunSheetReady()) {
-      run.failed = false;
-      run._loading = false;
-      if (!run.ready) run.img = null;
-      loadImageAsset(run, () => { tryNotifyGameplayReady(); });
-    } else {
-      tryNotifyGameplayReady();
-    }
+    ensurePrimaryMotionSheets();
   });
 }
 
-/** 开跑最低要求：出战角色跑步表已解码（手机上失败则看不见人） */
-function primaryRunSheetReady() {
-  const id = selectedChar === 'warrior' ? 'warrior' : 'mage';
-  const run = CHAR_RUN_SHEETS[id];
-  return !!(run?.ready && run.img?.width > 0 && (run.frames?.length || run.cols));
-}
-
 function tryNotifyGameplayReady() {
-  if (!primaryRunSheetReady()) return false;
+  if (!primaryMotionSheetsReady()) return false;
   notifyGameplayReady();
   return true;
 }
