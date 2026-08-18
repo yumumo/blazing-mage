@@ -181,8 +181,8 @@ def main() -> None:
         if p.exists():
             normalize_sheet_to_horizontal(p)
 
-    if (ASSETS / "warrior-roll-sheet.png").exists():
-        darken_middle_h(ASSETS / "warrior-roll-sheet.png", 0.82)
+    if (ASSETS / "characters" / "warrior" / "warrior-roll-sheet.png").exists():
+        darken_middle_h(ASSETS / "characters" / "warrior" / "warrior-roll-sheet.png", 0.82)
 
     mpath = ASSETS / "sprite-manifest.json"
     ref = {"mage": 275, "warrior": 277}
@@ -233,7 +233,7 @@ def main() -> None:
     c = re.sub(r"ASSET_VER = '[^']+'", "ASSET_VER = '20260813q'", c, count=1)
     CHARS.write_text(c, encoding="utf-8", newline="\n")
 
-    for p in ASSETS.glob("*-magenta.png"):
+    for p in ASSETS.rglob("*-magenta.png"):
         p.unlink()
 
     for n, mt0 in run_mtime.items():

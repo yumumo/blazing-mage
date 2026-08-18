@@ -14,18 +14,20 @@ www/castle-parkour/
       index.js            # barrel（优先从此 import）
       characters.js       # 可玩角色注册表 + ASSET_VER
       world.js            # 世界道具/障碍贴图注册表
-      gameplay.js         # 画布尺寸与玩法数值（扩展点）
+      monsters.js         # 敌人名 / 立绘 / 运动帧语义
+      gameplay.js         # 数值 + DIFF_FLOOR / DIFF_CEIL
   assets/                 # 局内真源 PNG + sprite-manifest.json
-                          # 只放：立绘、散帧、run/roll sheet、世界图
+                          # characters / enemies / world / ui / fonts
 ```
 
 ## 扩展点（先改配置，再补图 / 再动 game.js）
 
 | 要加什么 | 改哪里 |
 |----------|--------|
-| 新角色 | `config/characters.js`（或 `registerCharacter()`）+ `assets/` + measure |
-| 新障碍/道具图 | `config/world.js`（或 `registerWorldAsset()`）+ `assets/` |
-| 调跳跃/坑/蝙蝠等数值 | `config/gameplay.js` |
+| 新角色 | `config/characters.js`（`registerCharacter`）+ `assets/characters/<id>/` |
+| 新敌人 | `config/monsters.js`（`registerMonster`）+ `assets/enemies/` |
+| 新障碍/道具图 | `config/world.js`（`registerWorldAsset`）+ `assets/world/` |
+| 调跳跃/坑/难度 | `config/gameplay.js`（含 `DIFF_*`） |
 | 换图刷缓存 | `ASSET_VER`（`characters.js`） |
 | 商店文案 / 状态机 | `game.js` |
 
@@ -34,6 +36,6 @@ www/castle-parkour/
 | 目录 | 放什么 |
 |------|--------|
 | `assets/` | 局内加载的透明 PNG + `sprite-manifest.json` |
-| `dev/art-raw/`（gitignore） | 品红原稿、`*-jump/atk/fly-sheet.png` 中间态 |
+| `Back-castle-parkour/art-raw/`（gitignore） | 品红原稿与中间态 |
 
-**不要**把 `*-jump-sheet` / `*-atk-sheet` / `*-fly-sheet` / `*-magenta` 放进 `assets/`——局内只用切好的散帧 + run/roll sheet。
+局内运动帧必须是 sheet（run/jump/fly/atk/roll），禁止依赖散帧。品红 `*-magenta` 勿放进 `assets/`。

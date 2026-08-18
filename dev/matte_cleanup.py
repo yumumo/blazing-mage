@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import sys
 
 import numpy as np
 from PIL import Image, ImageFilter
 
-ASSETS = Path(__file__).resolve().parent.parent / "www" / "castle-parkour" / "assets"
-RAW = Path(__file__).resolve().parent / "art-raw"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from asset_layout import ASSETS, RAW  # noqa: E402
 RAW.mkdir(parents=True, exist_ok=True)
 
 
@@ -134,7 +135,7 @@ def scan(path: Path) -> dict:
 def main() -> None:
     report = []
     fixed = []
-    for path in sorted(ASSETS.glob("*.png")):
+    for path in sorted(ASSETS.rglob("*.png")):
         if "portrait" in path.name:
             continue
         before = scan(path)

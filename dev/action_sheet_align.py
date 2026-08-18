@@ -14,6 +14,7 @@ import numpy as np
 from PIL import Image
 
 from import_jump_roll_sheets import content_box, plant
+from asset_layout import RAW, SINGLES, find_asset, find_raw
 
 CW, CH = 512, 768
 FOOT = CH - 14
@@ -21,18 +22,22 @@ MARGIN = 16
 
 DEV = Path(__file__).resolve().parent
 ASSETS = DEV.parent / "www" / "castle-parkour" / "assets"
-RAW = DEV / "art-raw"
-SINGLES = RAW / "singles"
 
 
 def resolve_single(cid: str, name: str) -> Path:
-    """散帧查找顺序：art-raw/singles → art-raw → assets（兼容旧路径）。"""
+    """散帧查找顺序：art-raw/singles → art-raw（递归）→ assets。"""
     fname = f"{cid}-{name}.png"
-    for base in (SINGLES, RAW, ASSETS):
-        p = base / fname
-        if p.exists():
-            return p
-    raise FileNotFoundError(fname)
+    direct = SINGLES / fname
+    if direct.is_file():
+        return direct
+    try:
+        return find_raw(fname)
+    except FileNotFoundError:
+        pass
+    try:
+        return find_asset(fname)
+    except FileNotFoundError as e:
+        raise FileNotFoundError(fname) from e
 
 
 def crop_alpha(im: Image.Image) -> Image.Image:
@@ -63,7 +68,7 @@ def iter_run_cells(im: Image.Image):
 
 def run_target_height(cid: str) -> int:
     """跑步表各格 content 高度中位数（跳过空格）。"""
-    run_path = ASSETS / f"{cid}-run-sheet.png"
+    run_path = find_asset(f"{cid}-run-sheet.png")
     im = Image.open(run_path).convert("RGBA")
     hs: list[int] = []
     for cell in iter_run_cells(im):
@@ -81,7 +86,7 @@ def run_target_height(cid: str) -> int:
 
 def run_ruler_cell(cid: str, idx: int = 3) -> Image.Image:
     """取跑步表一格作尺度参考（不是立绘）。"""
-    run_path = ASSETS / f"{cid}-run-sheet.png"
+    run_path = find_asset(f"{cid}-run-sheet.png")
     im = Image.open(run_path).convert("RGBA")
     cells = []
     for cell in iter_run_cells(im):

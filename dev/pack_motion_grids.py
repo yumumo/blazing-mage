@@ -23,6 +23,7 @@ DEV = Path(__file__).resolve().parent
 sys.path.insert(0, str(DEV))
 
 from action_sheet_align import run_ruler_cell, resolve_single  # noqa: E402
+from asset_layout import ASSETS as LAYOUT_ASSETS, find_asset  # noqa: E402
 
 ASSETS = ROOT / "www" / "castle-parkour" / "assets"
 
@@ -67,7 +68,7 @@ def pack_char_jump(cid: str) -> Path:
 
     action = expand_jump_up_down(*poses)
     cells = [ruler, *action, ruler]
-    out = ASSETS / f"{cid}-jump-sheet.png"
+    out = LAYOUT_ASSETS / "characters" / cid / f"{cid}-jump-sheet.png"
     write_pose_grid(out, cells, cols=3, rows=3)
     print(f"wrote {out.name} 3x3 clean jump (no lerp) frameCount={len(cells)}")
     return out
@@ -78,7 +79,7 @@ def pack_char_atk(cid: str) -> Path:
     poses = [Image.open(resolve_single(cid, n)) for n in names]
     ruler = run_ruler_cell(cid, idx=3)
     cells: list[Image.Image | None] = [ruler, *poses, ruler]
-    out = ASSETS / f"{cid}-atk-sheet.png"
+    out = LAYOUT_ASSETS / "characters" / cid / f"{cid}-atk-sheet.png"
     _paste_grid(cells, 2, 2, CHAR_CW, CHAR_CH).save(out)
     print(f"wrote {out.name} 2x2 bookends+{len(poses)} frameCount={len(cells)}")
     return out

@@ -5,6 +5,7 @@ import {
   CHAR_RUN_SHEETS,
   CHAR_ROLL_SHEETS,
   CHAR_JUMP_SHEETS,
+  CHAR_FLY_SHEETS,
   CHAR_ATK_SHEETS,
   WORLD_ASSETS,
   VIEW,
@@ -14,6 +15,8 @@ import {
   CHAR_W,
   CHAR_H_STAND,
   CHAR_H_DUCK,
+  BODY_HIT_W,
+  BODY_HIT_H,
   GRAV,
   JUMP_V,
   JUMP_H,
@@ -24,6 +27,7 @@ import {
   ATTACK_CD,
   WARRIOR_ATTACK_CD,
   SWORD_SLASH_DUR,
+  WARRIOR_ATK_ROLE_ENDS,
   MAGE_ATK_DUR,
   MAGE_ATK_FIRE_AT,
   FB_SPEED,
@@ -40,8 +44,11 @@ import {
   BAT_CHASE_VX,
   BAT_Y,
   ROLL_DUR,
+  LAND_POSE_DUR,
+  LAND_POSE_DUR_SHORT,
   ROLL_SPEED_BOOST,
   ROLL_CD,
+  ROLL_BALL_DRAW,
   ROLL_HIT_FROM_DRAW,
   FAST_FALL_V,
   COIN_R,
@@ -53,6 +60,10 @@ import {
   MAGNET_PULL_MIN_FLY,
   MAGNET_PULL_R,
   PX_PER_METER,
+  DIFF_FLOOR,
+  DIFF_CEIL,
+  DIFF_RAMP_START_M,
+  DIFF_RAMP_END_M,
   KILL_GOLD,
   METER_PER_GOLD,
   GAP_W_MIN,
@@ -126,7 +137,7 @@ function initAudio() {
   try {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     bgmGain = audioCtx.createGain();
-    bgmGain.gain.value = bgmVolume * 0.15;
+    bgmGain.gain.value = bgmVolume * 0.42;
     bgmGain.connect(audioCtx.destination);
   } catch (e) { audioCtx = null; }
 }
@@ -134,7 +145,7 @@ function initAudio() {
 function setBgmVolume(v) {
   bgmVolume = v;
   localStorage.setItem('castle-parkour-vol-bgm', String(v));
-  if (bgmGain) bgmGain.gain.value = v * 0.15;
+  if (bgmGain) bgmGain.gain.value = v * 0.42;
 }
 
 function setSfxVolume(v) {
@@ -169,7 +180,7 @@ function playBgmNote() {
   osc.type = 'triangle';
   osc.frequency.value = mel;
   g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(0.14, t + 0.05);
+  g.gain.linearRampToValueAtTime(0.18, t + 0.05);
   g.gain.exponentialRampToValueAtTime(0.01, t + 0.55);
   osc.connect(g); g.connect(bgmGain);
   osc.start(t); osc.stop(t + 0.58);
@@ -383,8 +394,10 @@ const mageOrbitUnlocked = () => charData.mage.atk >= MAGE_ATK_MAX;
 const warriorAtkPower = () => Math.min(WARRIOR_ATK_PWR_MAX, WARRIOR_ATK_PWR_MIN + charData.warrior.atk - 1);
 const warriorParryUnlocked = () => charData.warrior.atk >= WARRIOR_ATK_MAX;
 const mageAtkDesc = (lv) => {
-  if (lv >= MAGE_ATK_MAX) return '无怪攻击蓄球，有怪时自动索敌';
-  if (lv >= MAGE_ATK_PWR_MAX) return '下一级解锁环绕火球';
+  if (lv >= MAGE_ATK_MAX) {
+    return '满能量无怪召环绕大火球（最多3）；未满/满后/有怪时发普通火球';
+  }
+  if (lv >= MAGE_ATK_PWR_MAX) return '下一级解锁环绕大火球';
   return `攻击力 ${lv}（火球伤害）`;
 };
 const warriorAtkDesc = (lv) => {
@@ -583,6 +596,7 @@ let canDoubleJump = false;   // 二段跳可用
 let airJumpCount = 0;        // 0地面 / 1一段跳 / 2二段跳（动作衔接）
 let airAge = 0;              // 离地时长（动作衔接）
 let landPoseT = 0;           // 落地缓冲帧计时
+let landPoseMax = LAND_POSE_DUR; // 本次落地姿态总时长（墙钟固定）
 let jumpPeakH = 0;           // 本段滞空达到的最大离地高（动态帧用）
 let lastMilestone = 0;       // 上次里程碑距离
 let milestoneFx = 0;         // 里程碑特效计时
@@ -621,7 +635,6 @@ let portalSuck = null;         // 吸入中 { t, fromX, fromY, toX, toY }
 let portalSpawnTries = 0;      // 到达距离后连续尝试生成次数（避免永远刷不出）
 let bonusReturnDist = 0;       // 进入奖励空间前的世界距离
 let transitionFx = 0;          // 过渡特效计时
-let bonusFinaleSpawned = false; // 奖励空间收尾金币是否已生成
 
 function scheduleNextPortal(fromDist) {
   const base = fromDist == null ? distanceM() : fromDist;
@@ -685,14 +698,23 @@ let jumpPressed = false;
 const keys = new Set();
 
 // ===================== 派生值 =====================
-// 距离驱动速度倍率：100-300m→1.25x，500-700m→1.5x
+// 距离驱动速度倍率：100-300m→1.25x，500-700m→1.5x；再乘难度缩放（开局+15% / 满速+50%）
+function difficultyScale() {
+  const d = distanceM();
+  if (d <= DIFF_RAMP_START_M) return DIFF_FLOOR;
+  if (d >= DIFF_RAMP_END_M) return DIFF_CEIL;
+  const t = (d - DIFF_RAMP_START_M) / (DIFF_RAMP_END_M - DIFF_RAMP_START_M);
+  return DIFF_FLOOR + t * (DIFF_CEIL - DIFF_FLOOR);
+}
 function speedMul() {
   const d = distanceM();
-  if (d < 100) return 1;
-  if (d < 300) return 1 + (d - 100) / 200 * 0.25;
-  if (d < 500) return 1.25;
-  if (d < 700) return 1.25 + (d - 500) / 200 * 0.25;
-  return 1.5;
+  let raw;
+  if (d < 100) raw = 1;
+  else if (d < 300) raw = 1 + (d - 100) / 200 * 0.25;
+  else if (d < 500) raw = 1.25;
+  else if (d < 700) raw = 1.25 + (d - 500) / 200 * 0.25;
+  else raw = 1.5;
+  return raw * difficultyScale();
 }
 const baseSpeed = () => 260 * speedMul();
 const speed = () => skySprintActive ? skySprintSpeed() : baseSpeed() + (rollTimer > 0 ? ROLL_SPEED_BOOST : 0);
@@ -846,11 +868,12 @@ function clearAhead(safeEnd, opts = {}) {
 }
 
 function obstacleSpawnChance(d) {
-  // 开局即可刷，随距离略增
-  if (d < 80) return 0.78;
-  if (d < 220) return 0.86;
-  if (d < 450) return 0.92;
-  return 0.96;
+  let p;
+  if (d < 80) p = 0.78;
+  else if (d < 220) p = 0.86;
+  else if (d < 450) p = 0.92;
+  else p = 0.96;
+  return Math.min(1, p * difficultyScale());
 }
 
 function spawnSegmentCoins(x0, x1, d) {
@@ -940,7 +963,7 @@ function trySpawnObstacle(x0, x1, d) {
     pool.push({
       w: 42, minW: 28,
       run(x) {
-        const big = Math.random() < (d > 250 ? 0.32 : 0.2);
+        const big = Math.random() < ((d > 250 ? 0.32 : 0.2) * difficultyScale());
         const mw = big ? 46 : 28;
         if (nearDuckHazards(x, mw)) return false;
         monsters.push({
@@ -1013,7 +1036,7 @@ function trySpawnObstacle(x0, x1, d) {
     const ent = pool[idx];
     const placed = tryPlace((x) => ent.run(x), availStart, availEnd, ent.minW);
     if (placed) {
-      featureCooldown = Math.max(0, Math.floor(d / 900));
+      featureCooldown = Math.max(0, Math.floor(d / (900 * difficultyScale())));
       return;
     }
   }
@@ -1021,7 +1044,7 @@ function trySpawnObstacle(x0, x1, d) {
 
 function trySpawnBat(d) {
   // 二层高度、侧面朝左，从屏右外向角色飞来
-  if (d <= 110 || bonusActive || Math.random() >= 0.038) return;
+  if (d <= 110 || bonusActive || Math.random() >= 0.038 * difficultyScale()) return;
   bats.push({
     x: W + 280,
     y: BAT_Y,
@@ -1063,13 +1086,7 @@ function spawnFeature(x0, x1, afterGap) {
       const n = 4 + Math.floor(Math.random() * 3);
       const spacing = 40;
       const startX = x0 + OBSTACLE_MARGIN + Math.max(0, (span - (n - 1) * spacing) * 0.2);
-      for (let i = 0; i < n; i++) {
-        const cx = startX + i * spacing;
-        if (cx > x1 - OBSTACLE_MARGIN) break;
-        const t = n > 1 ? i / (n - 1) : 0;
-        const cy = GROUND - 48 - Math.sin(t * Math.PI) * 40;
-        coins.push({ x: cx, y: cy, bob: i * 0.5, taken: false });
-      }
+      spawnBonusCoinRun(startX, n, spacing, 40, x1 - OBSTACLE_MARGIN);
     }
     return;
   }
@@ -1156,36 +1173,38 @@ function genStep() {
     return;
   }
 
-  const gapChance = d < 40 ? 0.05 : Math.min(0.16, 0.07 + d / 16000);
+  const gapChance = (d < 40 ? 0.05 : Math.min(0.16, 0.07 + d / 16000)) * difficultyScale();
   const isGap = gapCooldown <= 0 && jumpObsCd <= 0 && duckObsCd <= 0 && Math.random() < gapChance;
   if (isGap) {
-    // 后期坑洞加宽：300m 开始渐增，600m 后达到 130-180px
+    const ds = difficultyScale();
     let w;
     if (d < 300) {
-      w = GAP_W_MIN + Math.random() * (GAP_W_MAX - GAP_W_MIN);           // 80-120px
+      w = GAP_W_MIN + Math.random() * (GAP_W_MAX - GAP_W_MIN);
     } else if (d < 600) {
-      const t = (d - 300) / 300;                                         // 0→1
+      const t = (d - 300) / 300;
       const minW = GAP_W_MIN + t * (GAP_W_LATE_MIN - GAP_W_MIN);
       const maxW = GAP_W_MAX + t * (GAP_W_LATE_MAX - GAP_W_MAX);
       w = minW + Math.random() * (maxW - minW);
     } else {
-      w = GAP_W_LATE_MIN + Math.random() * (GAP_W_LATE_MAX - GAP_W_LATE_MIN); // 130-180px
+      w = GAP_W_LATE_MIN + Math.random() * (GAP_W_LATE_MAX - GAP_W_LATE_MIN);
     }
+    w *= ds;
     gaps.push({ x: genX, w });
     genX += w;
-    gapCooldown = GAP_COOLDOWN;
+    gapCooldown = Math.max(2, Math.round(GAP_COOLDOWN / ds));
     platformAfterGap = 0;
     markJumpAction();
     return;
   }
 
   // 坑后首段路面更长 + 安全区；远距离段面缩短增加密度
-  const dLen = Math.max(0, (500 - Math.min(500, d)) / 500); // 1→0 随距离递减
+  const ds = difficultyScale();
+  const dLen = Math.max(0, (500 - Math.min(500, d)) / 500);
   let len;
   if (platformAfterGap === 0) {
-    len = POST_GAP_SAFE + 80 + dLen * 30 + Math.random() * 100; // 坑后更长安全区
+    len = (POST_GAP_SAFE + 80 + dLen * 30 + Math.random() * 100) / ds;
   } else {
-    len = 150 + dLen * 20 + Math.random() * (120 + dLen * 20);
+    len = (150 + dLen * 20 + Math.random() * (120 + dLen * 20)) / ds;
   }
   platforms.push({ x0: genX, x1: genX + len });
 
@@ -1196,8 +1215,9 @@ function genStep() {
     if (since >= ELEV_STRUCT_MIN_GAP && d > 80 && platformAfterGap >= 1) {
       const t = Math.min(1, (since - ELEV_STRUCT_MIN_GAP) / Math.max(1, ELEV_STRUCT_SOFT_GAP - ELEV_STRUCT_MIN_GAP));
       // 过最小间距约 35%，到软间隔约 55%；连续失败用保底抬高
-      let chance = 0.35 + 0.20 * t;
-      if (since >= ELEV_STRUCT_SOFT_GAP * 1.5) chance = Math.max(chance, 0.72);
+      let chance = (0.35 + 0.20 * t) * difficultyScale();
+      if (since >= ELEV_STRUCT_SOFT_GAP * 1.5) chance = Math.max(chance, 0.72 * difficultyScale());
+      chance = Math.min(0.92, chance);
       if (Math.random() < chance) {
         if (spawnElevatedStructure(tryX)) {
           markJumpAction();
@@ -1311,34 +1331,34 @@ function spawnElevatedMonster(plats) {
   });
 }
 
-function spawnBonusCoins() {
-  // 奖励空间：以可读弧线为主，减少杂乱之字
-  for (let batch = 0; batch < 6; batch++) {
-    const baseX = genX + batch * 220 + Math.random() * 60;
-    const roll = Math.random();
-    const pattern = roll < 0.72 ? 1 : (roll < 0.90 ? 0 : 2);
-    const n = 4 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < n; i++) {
-      const cx = baseX + i * 40;
-      const t = n > 1 ? i / (n - 1) : 0;
-      let cy;
-      if (pattern === 1) cy = GROUND - 52 - Math.sin(t * Math.PI) * 40;
-      else if (pattern === 0) cy = GROUND - 48;
-      else cy = i % 2 === 0 ? GROUND - 42 : GROUND - 78;
-      coins.push({ x: cx, y: cy, bob: i * 0.5, taken: false });
-    }
+/** 出口前还能滚到角色面前的最远金币 x（留约 3m 缓冲） */
+function bonusCoinCutoffX() {
+  const remainPx = Math.max(0, (BONUS_DIST_MAX - bonusDist) * PX_PER_METER);
+  return CHAR_X + remainPx - 80;
+}
+
+function spawnBonusCoinRun(baseX, n, spacing, amp, hardMax) {
+  const cutoff = Math.min(bonusCoinCutoffX(), hardMax == null ? Infinity : hardMax);
+  for (let i = 0; i < n; i++) {
+    const cx = baseX + i * spacing;
+    if (cx > cutoff) break;
+    const t = n > 1 ? i / (n - 1) : 0;
+    coins.push({
+      x: cx,
+      y: GROUND - 48 - Math.sin(t * Math.PI) * amp,
+      bob: i * 0.5,
+      taken: false,
+    });
   }
 }
 
-// 奖励空间收尾金币爆发（最后 50m 生成大金币弧）
-function spawnBonusFinale() {
-  const baseX = genX;
-  const n = 12;
-  for (let i = 0; i < n; i++) {
-    const cx = baseX + i * 35;
-    const t = n > 1 ? i / (n - 1) : 0;
-    const cy = GROUND - 40 - Math.sin(t * Math.PI) * 72;
-    coins.push({ x: cx, y: cy, bob: i * 0.3, taken: false });
+function spawnBonusCoins() {
+  // 只铺进场第一屏；后续由 spawnFeature 按剩余距离裁剪补币
+  const cutoff = Math.min(bonusCoinCutoffX(), W + 200);
+  const step = 200;
+  for (let x = CHAR_X + 80; x < cutoff; x += step) {
+    const n = 4 + Math.floor(Math.random() * 2);
+    spawnBonusCoinRun(x, n, 38, 28, cutoff);
   }
 }
 
@@ -1346,7 +1366,6 @@ function enterBonusSpace() {
   bonusReturnDist = distanceM();
   bonusActive = true;
   bonusDist = 0;
-  bonusFinaleSpawned = false;
   transitionFx = 1.0;
   portal = null;
   portalSuck = null;
@@ -1389,7 +1408,7 @@ function beginRun() {
   px = 0; vy = 0; ducking = false; rollTimer = 0; rollCdTimer = 0; fastFalling = false; atkCd = 0; attackFx = 0;
   worldX = 0; killCount = 0; runTime = 0;
   genX = 0; gapCooldown = 3; invincible = 0;
-  energy = ENERGY_MAX; canDoubleJump = false; airJumpCount = 0; airAge = 0; landPoseT = 0; jumpPeakH = 0;
+  energy = ENERGY_MAX; canDoubleJump = false; airJumpCount = 0; airAge = 0; landPoseT = 0; landPoseMax = LAND_POSE_DUR; jumpPeakH = 0;
   lastMilestone = 0; milestoneFx = 0; milestoneText = '';
   coinPickups = 0; featureCooldown = 0; duckObsCd = 0; jumpObsCd = 0; platformAfterGap = 0;
   lastElevStructEnd = -1e9;
@@ -1428,7 +1447,6 @@ function beginRun() {
   nextPortalDist = PORTAL_FIRST_DIST;
   portalSpawnTries = 0;
   portal = null; portalSuck = null; transitionFx = 0; bonusReturnDist = 0;
-  bonusFinaleSpawned = false;
   // 道具状态重置 + 从 ownedItems 装备选中的道具
   activeItems = { double: false, revive: false };
   itemTimers = { magnet: 0 };
@@ -1479,7 +1497,7 @@ function syncPauseUi() {
   const pauseBtn = document.getElementById('btn-pause');
   if (!running || over) {
     if (pauseBtn) pauseBtn.textContent = '暂停';
-    if (bgmGain) bgmGain.gain.value = bgmVolume * 0.15;
+    if (bgmGain) bgmGain.gain.value = bgmVolume * 0.42;
     return;
   }
   if (paused) {
@@ -1487,13 +1505,13 @@ function syncPauseUi() {
     startBtn.disabled = false;
     homeBtn.style.display = 'inline-block';
     if (pauseBtn) pauseBtn.textContent = '继续';
-    if (bgmGain) bgmGain.gain.value = bgmVolume * 0.05;
+    if (bgmGain) bgmGain.gain.value = bgmVolume * 0.14;
   } else {
     startBtn.textContent = '重新开始';
     startBtn.disabled = true;
     homeBtn.style.display = 'none';
     if (pauseBtn) pauseBtn.textContent = '暂停';
-    if (bgmGain) bgmGain.gain.value = bgmVolume * 0.15;
+    if (bgmGain) bgmGain.gain.value = bgmVolume * 0.42;
   }
 }
 
@@ -1725,8 +1743,8 @@ function attack() {
   if (atkCd > 0) return;
   const atkBoost = puTimers.attack > 0;
   const cost = atkBoost ? ENERGY_COST * 0.5 : ENERGY_COST;
-  if (energy < cost) return;
   if (isWarrior()) {
+    if (energy < cost) return;
     energy -= cost;
     attackFx = SWORD_SLASH_DUR;
     atkCd = atkBoost ? WARRIOR_ATTACK_CD * 0.7 : WARRIOR_ATTACK_CD;
@@ -1736,20 +1754,29 @@ function attack() {
     meleeHitInRange(range);
     sfxAttack();
   } else {
-    if (fireballs.length >= MAX_BULLETS) return;
-    // 大火球：至少够一发基础耗能，出手后清空当前能量，体型/伤害按耗能量缩放
-    const spent = energy;
-    energy = 0;
-    atkCd = atkBoost ? ATTACK_CD * 0.55 : ATTACK_CD;
-    attackFx = MAGE_ATK_DUR;
-    const fy = GROUND - px - U * (ducking ? 0.55 : 1.05);
-    const ratio = Math.min(1, spent / ENERGY_MAX);
-    const fbs = (atkBoost ? FB_SPEED * 1.45 : FB_SPEED) * (0.92 + ratio * 0.35);
-    const rScale = 1 + ratio * 1.8;
-    const dmg = Math.max(1, Math.round(mageAtkPower() * (spent / ENERGY_COST) * (atkBoost ? 1.25 : 1)));
-    pendingMageShot = { delay: MAGE_ATK_FIRE_AT, fy, fbs, rScale, dmg, spent };
-    tryChargeOrbitOrb();
-    sfxAttack();
+    // 满级环绕：满能量 + 无怪 + 未满 3 → 耗尽召 1 颗；否则按普弹扣能
+    const canOrbitCharge = mageOrbitUnlocked()
+      && orbitOrbs.length < ORBIT_COUNT
+      && !findNearestHostile(ORBIT_SEEK_RANGE)
+      && energy >= ENERGY_MAX;
+    if (canOrbitCharge) {
+      energy = 0;
+      atkCd = atkBoost ? ATTACK_CD * 0.55 : ATTACK_CD;
+      attackFx = MAGE_ATK_DUR;
+      tryChargeOrbitOrb(1);
+      sfxAttack();
+    } else {
+      if (fireballs.length >= MAX_BULLETS) return;
+      if (energy < cost) return;
+      energy -= cost;
+      atkCd = atkBoost ? ATTACK_CD * 0.55 : ATTACK_CD;
+      attackFx = MAGE_ATK_DUR;
+      const fy = GROUND - px - U * (ducking ? 0.55 : 1.05);
+      const fbs = atkBoost ? FB_SPEED * 1.45 : FB_SPEED;
+      const dmg = Math.max(1, Math.round(mageAtkPower() * (atkBoost ? 1.25 : 1)));
+      pendingMageShot = { delay: MAGE_ATK_FIRE_AT, fy, fbs, rScale: 1, dmg };
+      sfxAttack();
+    }
   }
   if (tutorialShown && tutorialStep < TUTORIAL_STEPS.length && TUTORIAL_STEPS[tutorialStep].action === 'attack') tutorialActionDone = true;
 }
@@ -1828,17 +1855,21 @@ function orbitSlotPos(slot) {
   };
 }
 
-/** 无怪时攻击：蓄一颗环绕火球 */
-function tryChargeOrbitOrb() {
-  if (!mageOrbitUnlocked()) return;
-  if (findNearestHostile(ORBIT_SEEK_RANGE)) return;
+/** 无怪蓄球：每次攻击最多补 1 颗环绕大火球（上限 ORBIT_COUNT） */
+function tryChargeOrbitOrb(charges = 1) {
+  if (!mageOrbitUnlocked()) return 0;
+  if (findNearestHostile(ORBIT_SEEK_RANGE)) return 0;
+  const n = Math.max(1, Math.floor(charges) || 1);
   const used = new Set(orbitOrbs.map((o) => o.slot));
-  for (let s = 0; s < ORBIT_COUNT; s++) {
+  let added = 0;
+  for (let s = 0; s < ORBIT_COUNT && added < n; s++) {
     if (used.has(s)) continue;
     orbitOrbs.push({ slot: s, appear: 0 });
-    sfxOrbitReady();
-    return;
+    used.add(s);
+    added += 1;
   }
+  if (added) sfxOrbitReady();
+  return added;
 }
 
 /** 有怪时：环绕球依次飞出索敌，命中后消失 */
@@ -2010,11 +2041,6 @@ function update(dt) {
   // 奖励空间距离追踪
   if (bonusActive) {
     bonusDist += spd * dt / PX_PER_METER;
-    // 最后 50m 触发收尾金币弧（仅触发一次）
-    if (bonusDist >= BONUS_DIST_MAX - 50 && !bonusFinaleSpawned) {
-      bonusFinaleSpawned = true;
-      spawnBonusFinale();
-    }
     if (bonusDist >= BONUS_DIST_MAX) {
       // 奖励空间结束
       bonusActive = false;
@@ -2115,7 +2141,7 @@ function update(dt) {
       airJumpCount = 0;
       canDoubleJump = false;
       fastFalling = false;
-      landPoseT = 0.34;
+      landPoseMax = LAND_POSE_DUR; landPoseT = LAND_POSE_DUR;
       // 着陆安全区：30m（780px）内无障碍无怪物
       clearAhead(CHAR_X + 780, { featureCd: 4, gapCd: 4 });
     }
@@ -2153,9 +2179,15 @@ function update(dt) {
     }
 
     const currentGround = onPlatformY;
-    // 脚底取样：中心±脚宽，避免贴边落台/落地漏判
-    const footOnGround = currentGround > 0
-      || groundAt(CHAR_X - 12) || groundAt(CHAR_X) || groundAt(CHAR_X + 12);
+    // 翻滚只用中心脚点，避免左右点「架」在坑沿上滚过去
+    const overPit = currentGround <= 0
+      && !groundAt(CHAR_X - 6) && !groundAt(CHAR_X) && !groundAt(CHAR_X + 6);
+    if (rollTimer > 0 && overPit) rollTimer = 0;
+    const footOnGround = currentGround > 0 || (
+      rollTimer > 0
+        ? groundAt(CHAR_X)
+        : (groundAt(CHAR_X - 12) || groundAt(CHAR_X) || groundAt(CHAR_X + 12))
+    );
     const grounded = px <= currentGround + 0.5 && vy <= 0 && (currentGround > 0 || footOnGround);
 
     // 空中按下蹲伏 → 快速落地（教程冻结时不触发，避免提前落地）
@@ -2226,7 +2258,7 @@ function update(dt) {
           onPlatformY = best.y;
           canDoubleJump = false;
           airJumpCount = 0;
-          landPoseT = 0.26;
+          landPoseMax = LAND_POSE_DUR_SHORT; landPoseT = LAND_POSE_DUR_SHORT;
           airAge = 0;
           // 急坠落地：仅仍按住下才接翻滚，避免「一落地就滚」
           if (fastFalling) {
@@ -2239,7 +2271,10 @@ function update(dt) {
     // 地面着陆检测（脚宽取样）
     if (!tutFreeze && onPlatformY === 0 && vy <= 0 && px <= 0
       && (groundAt(CHAR_X - 12) || groundAt(CHAR_X) || groundAt(CHAR_X + 12))) {
-      if (airAge > 0.08) landPoseT = Math.max(landPoseT, 0.26);
+      if (airAge > 0.08) {
+        landPoseMax = Math.max(landPoseMax, LAND_POSE_DUR_SHORT);
+        landPoseT = Math.max(landPoseT, LAND_POSE_DUR_SHORT);
+      }
       px = 0;
       vy = 0;
       canDoubleJump = false;
@@ -2254,10 +2289,14 @@ function update(dt) {
   jumpPressed = false;
   duckPressed = false;
 
-  // 掉坑判定（深度达 GAP_FALL_KILL 才结算，给二段跳/操作窗口；起飞中跳过）
-  if (px < -GAP_FALL_KILL && !skySprintActive) {
-    escapePit();
-    if (!running) return;
+  // 掉坑：跳跃保留缓冲；已明确在坑上（无地面）时更早结算，防止翻滚蹭过去
+  {
+    const centerOverPit = onPlatformY <= 0 && !groundAt(CHAR_X);
+    const pitDepth = centerOverPit ? Math.min(GAP_FALL_KILL, 38) : GAP_FALL_KILL;
+    if (px < -pitDepth && !skySprintActive) {
+      escapePit();
+      if (!running) return;
+    }
   }
 
   // 碰撞与当前贴图显示对齐（跑/跳/攻/滚）
@@ -2497,102 +2536,7 @@ let _groundTheme = null;
 
 let _hudLayout = { buffTop: 88, buffRightX: W - 122 };
 
-function drawStoneHudPanel(x, y, w, h, alpha) {
-  ctx.fillStyle = `rgba(28,24,38,${alpha ?? 0.88})`;
-  ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = 'rgba(220,190,120,0.65)';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-  ctx.fillStyle = 'rgba(255,230,180,0.07)';
-  ctx.fillRect(x + 3, y + 3, w - 6, 3);
-}
-
-let castleHudFont = null;
-
-function loadCastleHudFont() {
-  const img = new Image();
-  img.decoding = 'async';
-  const metaP = fetch('assets/fonts/castle-hud-digits.json?v=' + ASSET_VER)
-    .then((r) => (r.ok ? r.json() : Promise.reject(new Error('hud font meta'))))
-    .catch(() => null);
-  const imgP = new Promise((resolve, reject) => {
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('hud font img'));
-  });
-  img.src = 'assets/fonts/castle-hud-digits.png?v=' + ASSET_VER;
-  Promise.all([imgP, metaP]).then(([image, meta]) => {
-    if (!meta?.glyphs) return;
-    castleHudFont = {
-      img: image,
-      glyphs: meta.glyphs,
-      cellH: meta.cellH || 128,
-      lineHeight: meta.lineHeight || 110,
-    };
-  }).catch(() => { castleHudFont = null; });
-}
-loadCastleHudFont();
-
-function castleHudCanDraw(text) {
-  if (!castleHudFont?.img?.complete) return false;
-  const s = String(text);
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
-    if (ch === ' ') continue;
-    if (!castleHudFont.glyphs[ch]) return false;
-  }
-  return s.length > 0;
-}
-
-function measureCastleHud(text, scale) {
-  let w = 0;
-  const s = String(text);
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
-    if (ch === ' ') { w += 10 * scale; continue; }
-    const g = castleHudFont.glyphs[ch];
-    w += (g.advance || g.w) * scale;
-  }
-  return w;
-}
-
-function drawCastleHudText(text, x, y, opts = {}) {
-  const {
-    align = 'left',
-    baseline = 'alphabetic',
-    scale: scaleIn,
-    font: fontIn = '',
-  } = opts;
-  const m = /(\d+(?:\.\d+)?)px/.exec(fontIn);
-  const px = m ? Number(m[1]) : 15;
-  const scale = scaleIn || Math.max(0.22, Math.min(0.55, px / 72));
-  const s = String(text);
-  const total = measureCastleHud(s, scale);
-  let cursor = x;
-  if (align === 'center') cursor = x - total / 2;
-  else if (align === 'right') cursor = x - total;
-  let baselineY = y;
-  if (baseline === 'middle' || baseline === 'center') baselineY = y + (castleHudFont.lineHeight * scale) * 0.35;
-  else if (baseline === 'top') baselineY = y + castleHudFont.lineHeight * scale * 0.85;
-  const drawY = baselineY - castleHudFont.lineHeight * scale * 0.82;
-  ctx.save();
-  ctx.imageSmoothingEnabled = true;
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
-    if (ch === ' ') { cursor += 10 * scale; continue; }
-    const g = castleHudFont.glyphs[ch];
-    const dw = g.w * scale;
-    const dh = g.h * scale;
-    ctx.drawImage(castleHudFont.img, g.x, g.y, g.w, g.h, cursor, drawY, dw, dh);
-    cursor += (g.advance || g.w) * scale;
-  }
-  ctx.restore();
-}
-
 function drawHudText(text, x, y, opts = {}) {
-  if (opts.bitmap !== false && castleHudCanDraw(text)) {
-    drawCastleHudText(text, x, y, opts);
-    return;
-  }
   const {
     fill = '#fffaf0',
     font: fontIn = `700 15px ${CASTLE_FONT}`,
@@ -3965,28 +3909,25 @@ function artFillCircle(c, x, y, r, color) {
   c.fill();
 }
 
-function artFillStrokeCircle(c, x, y, r, fill, stroke, lw) {
-  c.fillStyle = fill;
-  c.strokeStyle = stroke;
-  c.lineWidth = lw;
-  artCircle(c, x, y, r);
-  c.fill();
-  c.stroke();
-}
-
 function playerInvincibleFlicker(alpha) {
   if (invincible > 0 && Math.floor(animT * 12) % 2 === 0) ctx.globalAlpha = alpha;
 }
 
-function charBodyScale(charId) {
-  // 统一锁比：run.refH / manifest.refH（立绘同比例），禁止按单帧 content.h 缩放
+function run0ContentH(charId) {
   const run = CHAR_RUN_SHEETS[charId];
-  const refH = run?.refH || SPRITE_REF_H[charId] || 290;
-  return CHAR_H_STAND / Math.max(1, refH);
+  const fr0 = run?.frames?.[0];
+  // 优先用 run0 实测 content 高，让法师/战士站立视觉同高
+  if (fr0?.h > 8) return fr0.h;
+  return run?.refH || SPRITE_REF_H[charId] || 296;
+}
+
+function charBodyScale(charId) {
+  // 统一锁比：把该角色 run0 内容高映射到 CHAR_H_STAND（两侧同站立高）
+  return CHAR_H_STAND / Math.max(1, run0ContentH(charId));
 }
 
 /** run 内容宽度中位（manifest 覆盖；仅动作帧软顶用，跑步绘制不裁切） */
-const RUN_REF_W = { mage: 192, warrior: 223 };
+const RUN_REF_W = { mage: 254, warrior: 310 };
 
 /**
  * 动作帧绘制倍率：run.refH 锁比 × headScale(≤1)。
@@ -3998,15 +3939,21 @@ function motionDrawScale(charId, headScale, contentW, roleHint, contentH) {
   const hs = Number.isFinite(headScale) ? Math.min(1, headScale) : 1;
   let scale = base * hs;
   const role = roleHint ? String(roleHint) : '';
+  const isAction =
+    role.startsWith('roll')
+    || role.startsWith('atk')
+    || role.startsWith('jump')
+    || role.startsWith('fly');
   const h = Number(contentH) || 0;
-  if (h > 0) {
-    // 局内站立高的软顶：禁止 atk/起飞因 content 更高而比跑步「胀一圈」
+  // 动作帧：剑/杖抬高、展肢会撑高 contentH，禁止用包围盒高把身子压小（身尺锁 run0）
+  // 仅跑步等非动作帧保留站立高软顶，避免特效脏边把人胀大
+  if (!isAction && h > 0) {
     const maxH = CHAR_H_STAND * 1.02;
     const hCap = maxH / h;
     if (hCap < scale) scale = hCap;
   }
-  // 翻滚 / 攻击：杖/剑气可外伸，禁止按包围盒宽把整只人压小（否则出手帧突然变小）
-  if (role.startsWith('roll') || role.startsWith('atk')) return scale;
+  // 翻滚/攻击/跳跃/飞行：杖剑气与展肢可外伸，禁止按包围盒宽把整只人压小
+  if (isAction) return scale;
   const runW = RUN_REF_W[charId];
   const w = Number(contentW) || 0;
   if (runW > 0 && w > 0) {
@@ -4039,8 +3986,13 @@ function ensureSheetFrames(sheet) {
   const forceStrip = rows <= 1 && img?.width && img?.height && img.width >= img.height * 1.5;
   if (forceStrip) {
     rows = 1;
-    const guessed = Math.max(1, Math.round(img.width / 512));
-    if (!sheet.cols || Math.abs((img.width / cols) - 512) > 64) {
+    // Prefer configured cols; only guess from width when missing/stale.
+    // Do NOT assume 512 forever — plant may expand cellW (see gen-and-plant-notes §3.1b).
+    const tip = sheet.frames?.[0];
+    const tipW = tip?.cellW || tip?.w || 0;
+    const unit = tipW >= 64 ? tipW : Math.floor(img.width / Math.max(1, sheet.cols || 1));
+    const guessed = Math.max(1, Math.round(img.width / Math.max(64, unit || 512)));
+    if (!sheet.cols || Math.abs((img.width / cols) - (unit || 512)) > 64) {
       cols = guessed;
     }
     sheet.cols = cols;
@@ -4170,16 +4122,7 @@ function rollFrameIndex(n, progress) {
   return Math.min(n - 1, Math.floor(p * n));
 }
 
-function rollRoleHint(frameIndex, frameCount) {
-  const n = Math.max(1, frameCount | 0);
-  if (n <= 1) return 'roll0';
-  const t = frameIndex / (n - 1);
-  if (t < 0.34) return 'roll0';
-  if (t < 0.72) return 'roll1';
-  return 'roll2';
-}
-
-/** 翻滚帧布局：绘制与碰撞共用，避免两套缩放漂移。 */
+/** 翻滚帧布局：成球格锁死 ROLL_BALL_DRAW；书档格用站立锁比。 */
 function resolveRollFrameLayout(pick) {
   const { sheet, frame, charId } = pick || {};
   const img = sheet?.img;
@@ -4191,9 +4134,21 @@ function resolveRollFrameLayout(pick) {
   const srcW = hasContent ? frame.w : cellW;
   const srcH = hasContent ? frame.h : (frame.cellH || img.height);
   if (!srcW || !srcH) return null;
-  let scale = charBodyScale(charId);
-  const maxH = CHAR_H_STAND * 1.02;
-  if (srcH * scale > maxH) scale = maxH / srcH;
+  // 成球直径锁 ROLL_BALL_DRAW：必须用 max 边，否则羽冠/披风把 bbox 拉高后
+  // min 边映射会把整球放大，顶穿吊梁；缩 PNG 无效（局内仍按 DRAW 拉回）。
+  const span = Math.max(1, Math.max(srcW, srcH));
+  const short = Math.max(1, Math.min(srcW, srcH));
+  // 站姿书档明显高于成球（羽冠/站立）；成球近方
+  const isBookend = srcH > short * 1.25;
+  let scale;
+  if (isBookend) {
+    scale = charBodyScale(charId);
+    const maxH = CHAR_H_STAND * 1.02;
+    if (srcH * scale > maxH) scale = maxH / srcH;
+  } else {
+    // 跨角色：整盒最长边 → 同一成球直径（≈ CHAR_H_STAND*0.72）
+    scale = ROLL_BALL_DRAW / span;
+  }
   return {
     srcL, srcT, srcW, srcH,
     dw: srcW * scale,
@@ -4202,32 +4157,21 @@ function resolveRollFrameLayout(pick) {
   };
 }
 
-/** 翻滚碰撞：与当前帧显示同尺；宽取 min(dw,dh) 去掉尾气外扩。 */
+/** 翻滚碰撞：跨角色同体积方盒（相对 ROLL_BALL_DRAW）。 */
 function rollCharHitSize() {
-  const charId = isWarrior() ? 'warrior' : 'mage';
-  const layout = resolveRollFrameLayout(pickRollSheet(charId));
   const k = ROLL_HIT_FROM_DRAW;
-  if (!layout) {
-    const fallback = CHAR_H_DUCK * 1.1 * k;
-    return { w: fallback, h: fallback, ax: fallback / 2 };
-  }
-  const ball = Math.min(layout.dw, layout.dh);
-  return {
-    w: Math.max(28, ball * k),
-    h: Math.max(28, layout.dh * k),
-    ax: Math.max(14, ball * k * 0.5),
-  };
+  const side = Math.max(28, ROLL_BALL_DRAW * k);
+  return { w: side, h: side, ax: side / 2 };
 }
 
 /**
- * 角色碰撞盒与当前绘制对齐（脚底在 CHAR_X / GROUND-footY；含跑/跳/攻/滚）。
- * 不含 bob，避免抖动误伤。
+ * 角色碰撞盒：运动受击体积跨角色一致（不含杖剑羽冠外扩）。
+ * 脚底在 CHAR_X / GROUND-footY；不含 bob。
  */
 function playerHitBox() {
   const footY = rollTimer > 0 ? (onPlatformY || 0) : px;
   const cy = GROUND - footY;
   const cx = CHAR_X;
-  const charId = isWarrior() ? 'warrior' : 'mage';
 
   if (rollTimer > 0) {
     const hit = rollCharHitSize();
@@ -4239,56 +4183,13 @@ function playerHitBox() {
     };
   }
 
-  const sprite = pickCharSprite(charId);
-  if (sprite?.kind === 'runSheet') {
-    const layout = resolveRunFrameLayout(sprite);
-    if (layout?.dw > 0 && layout?.dh > 0) {
-      return {
-        x: cx - layout.ax * layout.scale,
-        y: cy - layout.dh,
-        w: layout.dw,
-        h: layout.dh,
-      };
-    }
-  }
-  if (sprite?.kind === 'motionSheet') {
-    const layout = resolveMotionSheetLayout(sprite);
-    if (layout?.dw > 0 && layout?.dh > 0) {
-      return {
-        x: cx - layout.ax * layout.scale,
-        y: cy - layout.dh,
-        w: layout.dw,
-        h: layout.dh,
-      };
-    }
-  }
-  if (sprite?.img) {
-    const m = ensureSpriteMeta(sprite);
-    if (m?.w > 0 && m?.h > 0) {
-      const scale = motionDrawScale(
-        m.char || charId,
-        m.headScale ?? 1,
-        m.w,
-        roleHintFromAsset(sprite, m),
-        m.h,
-      );
-      const dw = m.w * scale;
-      const dh = m.h * scale;
-      const footIn = Number.isFinite(m.anchor?.footXInContent) ? m.anchor.footXInContent : m.w * 0.5;
-      return {
-        x: cx - footIn * scale,
-        y: cy - dh,
-        w: dw,
-        h: dh,
-      };
-    }
-  }
-
+  const h = ducking ? CHAR_H_DUCK : BODY_HIT_H;
+  const w = BODY_HIT_W;
   return {
-    x: cx - CHAR_W / 2,
-    y: cy - CHAR_H_STAND,
-    w: CHAR_W,
-    h: CHAR_H_STAND,
+    x: cx - w / 2,
+    y: cy - h,
+    w,
+    h,
   };
 }
 
@@ -4365,18 +4266,19 @@ function drawPlayer() {
 
   if (rollTimer > 0) {
     const bob = 0;
-    drawPlayerBuffAuras(cx, cy, bob); // 翻滚时也显示护盾等光环
     drawPlayerRoll(cx, cy);
+    drawPlayerBuffAuras(cx, cy, bob); // 护盾等画在角色前层
     return;
   }
 
   // 下蹲/翻滚只缩碰撞盒（CHAR_H_DUCK），禁止 scaleY 压扁贴图（会把头压小）
   const bob = Math.sin(animT * 10) * 2;
 
-  drawPlayerBuffAuras(cx, cy, bob);
-
   const sprite = pickCharSprite(isWarrior() ? 'warrior' : 'mage');
-  if (sprite && drawCharSprite(cx, cy, bob, sprite)) return;
+  if (sprite && drawCharSprite(cx, cy, bob, sprite)) {
+    drawPlayerBuffAuras(cx, cy, bob);
+    return;
+  }
 
   // 跑步表未就绪时用跳跃宫格兜底，避免手机端「有碰撞无角色」
   const fallback = pickRoleSprite(
@@ -4384,6 +4286,7 @@ function drawPlayer() {
     'jumpLand', 'jumpAnt', 'jump', 'fly',
   );
   if (fallback) drawCharSprite(cx, cy, bob, fallback);
+  drawPlayerBuffAuras(cx, cy, bob);
   ctx.globalAlpha = 1;
 }
 
@@ -4394,6 +4297,11 @@ function drawFloats() {
     ctx.globalAlpha = a;
     const fx = f.x;
     const fy = f.y - (0.9 - f.t) * 34;
+    // 飘字避开左上 HUD 石板区，防止 +金币 叠在血条旁
+    if (fy < 98 && fx < 150) {
+      ctx.restore();
+      continue;
+    }
     if (f.heart) {
       ctx.fillStyle = '#ff6b9d';
       ctx.strokeStyle = '#1a1a1a';
@@ -4457,24 +4365,26 @@ function drawEnergyBar(x, y, label = '魔力', w = 96, h = 14) {
 }
 
 function drawHUD() {
-  const panelX = 10;
-  const hudX = 22;
-  const hpY = 18;
+  const hudTop = 8;
   const iconSize = 16;
   const iconGap = iconSize + 6;
+  const hpX = 14;
+  const hpY = hudTop + 8;
   const shieldY = hpY + iconGap;
   const energyY = shieldY + iconGap;
-  const leftPanelH = 84;
-  drawStoneHudPanel(panelX, 8, 118, leftPanelH);
+  const barW = 80;
 
+  // 心形血量图标
   for (let i = 0; i < charMaxHpSlots(); i++) {
-    const x = hudX + i * iconGap;
+    const x = hpX + i * iconGap;
     const y = hpY;
     ctx.save();
     ctx.globalAlpha = i < hp ? 1 : 0.28;
-    ctx.fillStyle = '#c45c6a';
-    ctx.strokeStyle = 'rgba(196,164,104,0.6)';
-    ctx.lineWidth = 1.5;
+    ctx.fillStyle = '#e05070';
+    ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.shadowBlur = 4;
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.lineWidth = 2;
     const s = iconSize / 2;
     ctx.beginPath();
     ctx.moveTo(x, y + s * 0.3);
@@ -4487,14 +4397,18 @@ function drawHUD() {
     ctx.stroke();
     ctx.restore();
   }
+
+  // 盾牌图标
   for (let i = 0; i < charMaxShdSlots(); i++) {
-    const x = hudX + i * iconGap;
+    const x = hpX + i * iconGap;
     const y = shieldY;
     ctx.save();
     ctx.globalAlpha = i < shield ? 1 : 0.28;
-    ctx.fillStyle = '#5a8a9a';
-    ctx.strokeStyle = 'rgba(196,164,104,0.6)';
-    ctx.lineWidth = 1.5;
+    ctx.fillStyle = '#4a9aaa';
+    ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.shadowBlur = 4;
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.lineWidth = 2;
     const s = iconSize / 2;
     ctx.beginPath();
     ctx.moveTo(x, y - s);
@@ -4510,57 +4424,54 @@ function drawHUD() {
   }
 
   if (isWarrior() && charData.warrior.talent > 0 && knightShelter > 0) {
-    const kx = hudX + charMaxShdSlots() * iconGap;
-    const ky = shieldY;
-    drawHudText('庇' + knightShelter, kx - 2, ky + 4, { fill: '#ffe08a', font: 'bold 11px system-ui,sans-serif', stroke: 3 });
+    drawHudText('庇' + knightShelter, hpX + charMaxShdSlots() * iconGap + 2, shieldY + 4, {
+      fill: '#ffe08a', font: 'bold 11px system-ui,sans-serif', align: 'left', baseline: 'middle', stroke: 3.5,
+    });
   }
 
-  if (isMage()) drawEnergyBar(hudX - 4, energyY, '魔力');
-  else if (isWarrior()) drawEnergyBar(hudX - 4, energyY, '体力');
+  // 能量条（无底板，只有条本身）
+  if (isMage()) drawEnergyBar(hpX - 2, energyY, '魔力', barW);
+  else if (isWarrior()) drawEnergyBar(hpX - 2, energyY, '体力', barW);
 
   const isLandscapeHud = document.getElementById('screen-game').classList.contains('game-landscape');
+
+  // 中央得分（横屏）
   if (isLandscapeHud) {
-    const scoreW = 168;
-    const scoreX = W / 2 - scoreW / 2;
-    const scoreH = bonusActive ? 52 : 38;
-    drawStoneHudPanel(scoreX, 6, scoreW, scoreH);
     if (bonusActive) {
       const remain = Math.max(0, BONUS_DIST_MAX - bonusDist);
-      drawHudText('宝库空间 ' + remain.toFixed(0) + 'm', W / 2, 18, {
-        fill: '#ffe08a', font: 'bold 11px system-ui,sans-serif', align: 'center', stroke: 2.5,
+      drawHudText('宝库空间 ' + remain.toFixed(0) + 'm', W / 2, hudTop + 10, {
+        fill: '#ffe08a', font: 'bold 12px system-ui,sans-serif', align: 'center', baseline: 'middle', stroke: 3,
       });
-      drawHudText('' + scoreVal(), W / 2, 40, {
-        fill: '#fffaf0', font: 'bold 18px system-ui,sans-serif', align: 'center', stroke: 3.5,
+      drawHudText('' + scoreVal(), W / 2, hudTop + 30, {
+        fill: '#fffaf0', font: 'bold 20px system-ui,sans-serif', align: 'center', baseline: 'middle', stroke: 4,
       });
     } else {
-      drawHudText('得分', W / 2, 18, { fill: '#ffe08a', font: 'bold 10px system-ui,sans-serif', align: 'center', stroke: 2.5 });
-      drawHudText('' + scoreVal(), W / 2, 35, { fill: '#fffaf0', font: 'bold 18px system-ui,sans-serif', align: 'center', stroke: 3.5 });
+      drawHudText('' + scoreVal(), W / 2, hudTop + 18, {
+        fill: '#fffaf0', font: 'bold 20px system-ui,sans-serif', align: 'center', baseline: 'middle', stroke: 4,
+      });
     }
-  }
 
-  const rightX = W - 128;
-  const mul = speedMul();
-  if (isLandscapeHud) {
-    drawStoneHudPanel(rightX, 6, 118, 68);
-    drawHudText('SPEED', W - 16, 18, { fill: 'rgba(255,248,232,0.75)', font: 'bold 9px system-ui,sans-serif', align: 'right', stroke: 2 });
-    drawHudText(mul.toFixed(1) + 'x', W - 16, 34, {
-      fill: mul >= 2.5 ? '#ff8a50' : mul >= 1.5 ? '#ffe08a' : '#8fd0a8',
-      font: 'bold 17px system-ui,sans-serif', align: 'right', stroke: 3.5,
+    // 右上：金币 + 距离（去掉 SPEED/倍速）
+    drawHudText('金币 ' + coinPickups, W - 12, hudTop + 10, {
+      fill: '#ffe08a', font: 'bold 12px system-ui,sans-serif', align: 'right', baseline: 'middle', stroke: 3,
     });
-    drawHudText('金币 ' + coinPickups, W - 16, 50, { fill: '#ffe08a', font: 'bold 12px system-ui,sans-serif', align: 'right', stroke: 3 });
-    drawHudText('距离 ' + scoreM() + 'm', W - 16, 66, { fill: '#fffaf0', font: 'bold 12px system-ui,sans-serif', align: 'right', stroke: 3 });
+    drawHudText(scoreM() + 'm', W - 12, hudTop + 28, {
+      fill: '#fffaf0', font: 'bold 13px system-ui,sans-serif', align: 'right', baseline: 'middle', stroke: 3.5,
+    });
     _hudLayout.buffTop = H - 118;
-    _hudLayout.buffRightX = rightX;
+    _hudLayout.buffRightX = W - 138;
   } else {
-    drawStoneHudPanel(rightX + 20, 6, 72, 28);
-    drawHudText(mul.toFixed(1) + 'x', W - 10, 25, {
-      fill: mul >= 2.5 ? '#ff8a50' : mul >= 1.5 ? '#ffe08a' : '#8fd0a8',
-      font: 'bold 14px system-ui,sans-serif', align: 'right', stroke: 3.5,
+    // 竖屏：右上 距离（上）+ 分数（下），字号对齐
+    drawHudText(scoreM() + 'm', W - 12, hudTop + 10, {
+      fill: '#fffaf0', font: 'bold 15px system-ui,sans-serif', align: 'right', baseline: 'middle', stroke: 4,
+    });
+    drawHudText('' + scoreVal(), W - 12, hudTop + 28, {
+      fill: '#ffe08a', font: 'bold 15px system-ui,sans-serif', align: 'right', baseline: 'middle', stroke: 4,
     });
     _hudLayout.buffTop = H - 100;
-    _hudLayout.buffRightX = W - 118;
+    _hudLayout.buffRightX = W - 138;
   }
-  _hudLayout.buffColW = 96;
+  _hudLayout.buffColW = 128;
   ctx.textAlign = 'left';
 }
 
@@ -4853,18 +4764,23 @@ function drawTransitionFx() {
 }
 
 function drawBuffTimerRow(x, y, w, label, remain, total, color, glow) {
-  drawStoneHudPanel(x, y, w, 24, 0.86);
+  // 进度条底（仅半透明色条，无石板背景）
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.32)';
+  ctx.fillRect(x, y + 4, w, 16);
   ctx.fillStyle = color;
-  ctx.globalAlpha = 0.42;
-  ctx.fillRect(x + 2, y + 2, Math.max(0, (w - 4) * (remain / total)), 20);
+  ctx.globalAlpha = 0.55;
+  ctx.fillRect(x, y + 4, Math.max(0, w * (remain / total)), 16);
   ctx.globalAlpha = 1;
-  drawHudText(label, x + 6, y + 16, {
-    fill: '#fffaf0', font: 'bold 12px "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif', stroke: 3,
+  ctx.restore();
+  drawHudText(label, x + 4, y + 12, {
+    fill: '#fffaf0', font: 'bold 12px "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif',
+    baseline: 'middle', stroke: 3.5,
   });
-  drawHudText(remain.toFixed(1) + 's', x + w - 6, y + 16, {
+  drawHudText(remain.toFixed(1) + 's', x + w - 2, y + 12, {
     fill: glow || '#ffe08a',
     font: 'bold 12px "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif',
-    align: 'right', stroke: 3,
+    align: 'right', baseline: 'middle', stroke: 3.5,
   });
 }
 
@@ -4874,11 +4790,9 @@ function drawItems() {
   const barW = _hudLayout.buffColW;
 
   if (itemShield > 0) {
-    const sx = 10;
-    const sy = 96;
-    drawStoneHudPanel(sx, sy, 108, 20, 0.82);
-    drawHudText('起飞充能 ×' + itemShield, sx + 6, sy + 14, {
-      fill: '#e8d8ff', font: 'bold 11px "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif', stroke: 3,
+    drawHudText('起飞充能 ×' + itemShield, 12, 96, {
+      fill: '#e8d8ff', font: 'bold 11px "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif',
+      baseline: 'middle', stroke: 3.5,
     });
   }
 
@@ -4887,18 +4801,18 @@ function drawItems() {
     puY += 28;
   }
   if (activeItems.double && puTimers.double <= 0) {
-    drawStoneHudPanel(puX, puY, barW, 24, 0.86);
-    drawHudText('双倍金币(装备)', puX + 6, puY + 16, {
-      fill: '#ffe08a', font: 'bold 12px "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif', stroke: 3,
+    drawHudText('双倍金币', puX, puY + 12, {
+      fill: '#ffe08a', font: 'bold 12px "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif',
+      baseline: 'middle', stroke: 3.5,
     });
-    puY += 28;
+    puY += 22;
   }
   if (activeItems.revive) {
-    drawStoneHudPanel(puX, puY, barW, 24, 0.86);
-    drawHudText('复活就绪', puX + 6, puY + 16, {
-      fill: '#ffb0b8', font: 'bold 12px "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif', stroke: 3,
+    drawHudText('复活就绪', puX, puY + 12, {
+      fill: '#ffb0b8', font: 'bold 12px "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif',
+      baseline: 'middle', stroke: 3.5,
     });
-    puY += 28;
+    puY += 22;
   }
 
   for (const k of PU_KEYS) {
@@ -4971,8 +4885,8 @@ function draw() {
   drawPortal();
   drawFireballs();
   drawSwordSwings();
-  drawOrbitOrbs();
   drawPlayer();
+  drawOrbitOrbs();
   drawSkySprint();
   drawFloats();
   drawHUD();
@@ -5395,13 +5309,15 @@ function loadSpriteManifest() {
         applySheetEntry(CHAR_RUN_SHEETS[id], 3, 3);
         applySheetEntry(CHAR_ROLL_SHEETS[id], 3, 3);
         applySheetEntry(CHAR_JUMP_SHEETS[id], 3, 3);
-        applySheetEntry(CHAR_ATK_SHEETS[id], 2, 2);
+        applySheetEntry(CHAR_FLY_SHEETS[id], 2, 2);
+        applySheetEntry(CHAR_ATK_SHEETS[id], CHAR_ATK_SHEETS[id]?.cols || 2, CHAR_ATK_SHEETS[id]?.rows || 2);
         // 空格会污染 sheet.refH；局内尺度锁跑步真源 296
         const runRef = 296;
         if (CHAR_RUN_SHEETS[id]) CHAR_RUN_SHEETS[id].refH = runRef;
         if (CHAR_ROLL_SHEETS[id]) CHAR_ROLL_SHEETS[id].refH = runRef;
         if (CHAR_ATK_SHEETS[id]) CHAR_ATK_SHEETS[id].refH = runRef;
         if (CHAR_JUMP_SHEETS[id]) CHAR_JUMP_SHEETS[id].refH = runRef;
+        if (CHAR_FLY_SHEETS[id]) CHAR_FLY_SHEETS[id].refH = runRef;
         if (SPRITE_REF_H) SPRITE_REF_H[id] = runRef;
       }
       applySheetEntry(WORLD_ASSETS.monsterWalk, 2, 2);
@@ -5542,6 +5458,7 @@ function primaryMotionSheetsReady() {
     CHAR_RUN_SHEETS[id],
     CHAR_ROLL_SHEETS[id],
     CHAR_JUMP_SHEETS[id],
+    CHAR_FLY_SHEETS[id],
     CHAR_ATK_SHEETS[id],
   ].every(sheetAssetReady);
 }
@@ -5590,6 +5507,7 @@ function listCriticalGameplayAssets() {
     CHAR_RUN_SHEETS[id],
     CHAR_ROLL_SHEETS[id],
     CHAR_JUMP_SHEETS[id],
+    CHAR_FLY_SHEETS[id],
     CHAR_ATK_SHEETS[id],
   ].filter(Boolean);
 }
@@ -5603,6 +5521,7 @@ function listDeferredGameplayAssets() {
     CHAR_RUN_SHEETS[secondary],
     CHAR_ROLL_SHEETS[secondary],
     CHAR_JUMP_SHEETS[secondary],
+    CHAR_FLY_SHEETS[secondary],
     CHAR_ATK_SHEETS[secondary],
   ].filter(Boolean);
 }
@@ -5681,13 +5600,6 @@ function drawWorldSpriteBox(asset, x, y, w, h) {
   return true;
 }
 
-function firstReadySprite(...assets) {
-  for (const a of assets) {
-    if (a?.ready) return a;
-  }
-  return null;
-}
-
 function pickRunSheet(charId) {
   const sheet = CHAR_RUN_SHEETS[charId];
   if (!sheet?.ready || !sheet.img?.width) return null;
@@ -5710,51 +5622,60 @@ function jumpHeightRef() {
 }
 
 /**
- * 按离地高度动态选跳跃帧（上升/下落分相）：
- * 低→蓄力/离地，中→上升，高→腾空；下落对称到落势/着地。
+ * 动作进度 → 角色索引：总时长由 *_DUR 锁死，帧数只影响扫帧密度。
+ * progress01: 0=起势 … 1=收势。
+ */
+function sheetRoleIndex(roles, progress01) {
+  const n = roles?.length || 0;
+  if (n <= 0) return 0;
+  const p = Math.max(0, Math.min(1, progress01));
+  return Math.min(n - 1, Math.floor(p * n));
+}
+
+/** 非均分：ends[i] = 第 i 格结束进度（累计，末项须为 1）。长度须与 roles 一致，否则回退均分。 */
+function sheetRoleIndexByEnds(roles, progress01, ends) {
+  const n = roles?.length || 0;
+  if (n <= 0) return 0;
+  if (!ends || ends.length !== n) return sheetRoleIndex(roles, progress01);
+  const p = Math.max(0, Math.min(1, progress01));
+  for (let i = 0; i < n - 1; i++) {
+    if (p < ends[i]) return i;
+  }
+  return n - 1;
+}
+
+function preferAroundRoles(roles, idx) {
+  if (!roles?.length) return [];
+  const i = Math.max(0, Math.min(roles.length - 1, idx));
+  return [
+    roles[i],
+    roles[Math.max(0, i - 1)],
+    roles[Math.min(roles.length - 1, i + 1)],
+  ];
+}
+
+/**
+ * 按离地高度动态选跳跃帧（上升/下落分相）。
+ * 离地总时间由 JUMP_H/GRAV 决定（不变）；中间帧均分高度进度。
  */
 function pickAirSprite(charId) {
   const h = heightAboveSupport();
   const ref = jumpHeightRef();
   const u = Math.max(0, Math.min(1, h / ref));
   const rising = vy >= -12;
+  // 上升：ant→peak；下落：peak→land（二段跳跳过 ant）
+  const rise = airJumpCount >= 2
+    ? ['jump', 'jumpRise', 'jumpPeak']
+    : ['jumpAnt', 'jump', 'jumpRise', 'jumpPeak'];
+  const fallRoles = ['jumpPeak', 'jumpFall', 'jumpRecover', 'jumpLand'];
 
-  // 二段跳：无蓄力蹲
-  if (airJumpCount >= 2) {
-    if (rising) {
-      if (u < 0.42) return pickRoleSprite(charId, 'jump', 'jumpRise', 'fly');
-      if (u < 0.78) return pickRoleSprite(charId, 'jumpRise', 'fly', 'jump');
-      return pickRoleSprite(charId, 'fly', 'flyFall', 'jumpRise');
-    }
-    if (u > 0.58) return pickRoleSprite(charId, 'fly', 'flyFall', 'jumpRise');
-    if (u > 0.24) return pickRoleSprite(charId, 'flyFall', 'jumpLand', 'fly');
-    return pickRoleSprite(charId, 'jumpLand', 'flyFall', 'jumpRecover', 'fly');
-  }
-
-  // 一段跳：高度三段起跳 + 对称落地
   if (rising) {
-    if (u < 0.14 || h < 11) {
-      return pickRoleSprite(charId, 'jumpAnt', 'jump', 'jumpRise');
-    }
-    if (u < 0.42) {
-      return pickRoleSprite(charId, 'jump', 'jumpRise', 'jumpAnt', 'fly');
-    }
-    if (u < 0.78) {
-      return pickRoleSprite(charId, 'jumpRise', 'jump', 'fly', 'jumpAnt');
-    }
-    return pickRoleSprite(charId, 'fly', 'flyFall', 'jumpRise', 'jump');
+    const idx = sheetRoleIndex(rise, u);
+    return pickRoleSprite(charId, ...preferAroundRoles(rise, idx), 'jumpPeak', 'jump');
   }
-
-  if (u > 0.62) {
-    return pickRoleSprite(charId, 'fly', 'flyFall', 'jumpRise', 'jump');
-  }
-  if (u > 0.34) {
-    return pickRoleSprite(charId, 'flyFall', 'fly', 'jumpLand', 'jump');
-  }
-  if (u > 0.12 || h > 10) {
-    return pickRoleSprite(charId, 'jumpLand', 'flyFall', 'jumpRecover', 'fly');
-  }
-  return pickRoleSprite(charId, 'jumpLand', 'jumpRecover', 'flyFall', 'jumpAnt');
+  // 下落：高→低 映射到 fallRoles（u=1 峰顶，u=0 贴地）
+  const idx = sheetRoleIndex(fallRoles, 1 - u);
+  return pickRoleSprite(charId, ...preferAroundRoles(fallRoles, idx), 'jumpLand', 'jumpFall');
 }
 
 /** 从跳/攻宫格 sheet 取角色（优先）；散帧仅兜底。首尾跑步参考用 bookends 跳过。 */
@@ -5775,6 +5696,11 @@ function pickRoleFromSheet(sheet, charId, role) {
 
 function pickRoleSprite(charId, ...roles) {
   for (const role of roles) {
+    const fly = CHAR_FLY_SHEETS[charId];
+    if (fly?.roles?.includes(role)) {
+      const p = pickRoleFromSheet(fly, charId, role);
+      if (p) return p;
+    }
     const jump = CHAR_JUMP_SHEETS[charId];
     if (jump?.roles?.includes(role)) {
       const p = pickRoleFromSheet(jump, charId, role);
@@ -5794,28 +5720,62 @@ function pickCharSprite(charId) {
     || (charId === 'mage' && attackFx > 0);
   if (atkActive) {
     if (charId === 'warrior') {
-      const windFrac = warriorSlashT / SWORD_SLASH_DUR;
-      if (windFrac > 0.62) return pickRoleSprite(charId, 'atkWind', 'atk');
-      if (windFrac > 0.22) return pickRoleSprite(charId, 'atk', 'atkWind');
+      // 墙钟 = SWORD_SLASH_DUR；下劈用 WARRIOR_ATK_ROLE_ENDS 非均分（总时长不变）
+      const p = 1 - Math.max(0, Math.min(1, warriorSlashT / SWORD_SLASH_DUR));
+      const roles = CHAR_ATK_SHEETS.warrior?.roles || [
+        'atkWind', 'atkStart', 'atkRise', 'atk', 'atkPeak', 'atkFollow', 'atkRecover',
+      ];
+      const idx = sheetRoleIndexByEnds(roles, p, WARRIOR_ATK_ROLE_ENDS);
+      return pickRoleSprite(charId, ...preferAroundRoles(roles, idx), 'atk', 'atkWind');
+    }
+    // 法师：墙钟 = MAGE_ATK_DUR；出弹时刻仍 MAGE_ATK_FIRE_AT（绝对秒，不随帧数变）
+    {
+      const p = 1 - Math.max(0, Math.min(1, attackFx / MAGE_ATK_DUR));
+      const roles = CHAR_ATK_SHEETS.mage?.roles || [
+        'atkWind', 'atkStart', 'atkRise', 'atk', 'atkPeak', 'atkFollow', 'atkRecover',
+      ];
+      if (roles.length >= 3) {
+        const idx = sheetRoleIndex(roles, p);
+        return pickRoleSprite(
+          charId,
+          ...preferAroundRoles(roles, idx),
+          'atk',
+          'atkWind',
+        );
+      }
+      if (p < 0.28) return pickRoleSprite(charId, 'atkWind', 'atk');
+      if (p < 0.72) return pickRoleSprite(charId, 'atk', 'atkWind');
       return pickRoleSprite(charId, 'atkWind', 'atk');
     }
-    const p = 1 - Math.max(0, Math.min(1, attackFx / MAGE_ATK_DUR));
-    if (p < 0.28) return pickRoleSprite(charId, 'atkWind', 'atk');
-    if (p < 0.72) return pickRoleSprite(charId, 'atk', 'atkWind');
-    return pickRoleSprite(charId, 'atkWind', 'atk');
   }
 
   if (skySprintActive) {
-    return pickRoleSprite(charId, 'fly', 'jump', 'jumpAnt');
+    // 墙钟 = skySprintDurActive；fly 表中间帧均分巡航进度
+    const flyRoles = CHAR_FLY_SHEETS[charId]?.roles || ['fly', 'flyFall'];
+    const p = Math.max(0, Math.min(1, skySprintTime / Math.max(0.001, skySprintDurActive)));
+    const idx = sheetRoleIndex(flyRoles, p);
+    return pickRoleSprite(
+      charId,
+      ...preferAroundRoles(flyRoles, idx),
+      'fly',
+      'jump',
+      'jumpAnt',
+    );
   }
 
   const h = heightAboveSupport();
   if (landPoseT > 0 && h <= 8) {
-    // 着地 → 起身衔接（后半段用 recover/ant 接回跑步）
-    if (landPoseT > 0.12) {
-      return pickRoleSprite(charId, 'jumpLand', 'jumpRecover', 'jumpAnt', 'jump');
-    }
-    return pickRoleSprite(charId, 'jumpRecover', 'jumpLand', 'jumpAnt', 'jump');
+    // 墙钟 = landPoseMax；前半着地蹲、后半起身
+    const maxT = Math.max(landPoseMax || LAND_POSE_DUR, landPoseT, 0.001);
+    const p = 1 - Math.max(0, Math.min(1, landPoseT / maxT));
+    const landRoles = ['jumpLand', 'jumpRecover'];
+    const idx = sheetRoleIndex(landRoles, p);
+    return pickRoleSprite(
+      charId,
+      ...preferAroundRoles(landRoles, idx),
+      'jumpAnt',
+      'jump',
+    );
   }
 
   const airborne = h > 6 || vy > 30;
@@ -5877,20 +5837,24 @@ function resolveRunFrameLayout(pick) {
   let srcW;
 
   const footAbsX = cellX + (sheet.runFootLocalX ?? ((frame.w || cellW || img.width) * 0.5));
-  const lockW = sheet.runLockW || 0;
-  if (lockW >= 8 && cellW > 0) {
-    srcW = lockW;
-    srcL = Math.round(footAbsX - srcW * 0.5);
-    const cellRight = cellX + cellW;
-    if (srcL < cellX) srcL = cellX;
-    if (srcL + srcW > cellRight) srcL = Math.max(cellX, cellRight - srcW);
-    srcW = Math.min(srcW, cellRight - srcL);
-  } else if (hasContent) {
+  // 必须画满 content 盒：旧 runLockW 窗裁掉杖尖/剑尖/尘土（每帧丢 15～45px）→ 局内「缺一块」
+  // runLockW 只保留给 ensureRunFootAnchors 算脚锚，不再当 drawImage 源宽。
+  if (hasContent) {
     srcL = frame.left;
     srcW = frame.w;
   } else {
-    srcL = cellX;
-    srcW = cellW || img.width;
+    const lockW = sheet.runLockW || 0;
+    if (lockW >= 8 && cellW > 0) {
+      srcW = lockW;
+      srcL = Math.round(footAbsX - srcW * 0.5);
+      const cellRight = cellX + cellW;
+      if (srcL < cellX) srcL = cellX;
+      if (srcL + srcW > cellRight) srcL = Math.max(cellX, cellRight - srcW);
+      srcW = Math.min(srcW, cellRight - srcL);
+    } else {
+      srcL = cellX;
+      srcW = cellW || img.width;
+    }
   }
 
   // 裁切越界保护（部分手机 drawImage 越界直接空白）

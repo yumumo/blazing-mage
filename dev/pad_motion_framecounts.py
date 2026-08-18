@@ -53,7 +53,7 @@ def pad_jump(cid: str) -> None:
 
 
 def pad_run(cid: str) -> None:
-    path = ASSETS / f"{cid}-run-sheet.png"
+    path = (ASSETS / "characters" / cid / f"{cid}-run-sheet.png")
     cells = nonempty_cells(path, 4, 4, CW, CH)
     if len(cells) < 4:
         cells = nonempty_cells(path, 3, 3, CW, CH)

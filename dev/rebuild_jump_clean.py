@@ -246,7 +246,7 @@ def rebuild(cid: str, dust: Image.Image | None) -> None:
     ruler = run_ruler_cell(cid, idx=3)
     seq = [ruler, *action, ruler]
     assert len(seq) == 9
-    dest = ASSETS / f"{cid}-jump-sheet.png"
+    dest = (ASSETS / "characters" / cid / f"{cid}-jump-sheet.png")
     write_pose_grid(dest, seq, cols=3, rows=3)
     print(f"{cid}: jump sheet ok (dust={'yes' if dust else 'no'})")
 

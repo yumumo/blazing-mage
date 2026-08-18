@@ -10,12 +10,13 @@ from __future__ import annotations
 
 from collections import deque
 from pathlib import Path
+import sys
 
 import numpy as np
 from PIL import Image
 
-RAW = Path(__file__).resolve().parent / "art-raw"
-ASSETS = Path(__file__).resolve().parents[1] / "www" / "castle-parkour" / "assets"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from asset_layout import ASSETS, RAW  # noqa: E402
 ALPHA = 28
 # 与跑步表同格，方便对照立绘尺
 CW, CH = 512, 768
@@ -123,6 +124,70 @@ def keep_largest(im: Image.Image) -> Image.Image:
     return Image.fromarray(out, "RGBA")
 
 
+def fill_enclosed_holes(im: Image.Image, max_area: int = 2800) -> Image.Image:
+    """填成球内部抠穿（与边不连通的透明岛）。不填开口到画布外的空隙。"""
+    a = np.array(im.convert("RGBA"))
+    H, W = a.shape[:2]
+    empty = a[:, :, 3] < 12
+    vis = np.zeros((H, W), dtype=bool)
+    q = deque()
+    for x in range(W):
+        if empty[0, x]:
+            vis[0, x] = True
+            q.append((0, x))
+        if empty[H - 1, x]:
+            vis[H - 1, x] = True
+            q.append((H - 1, x))
+    for y in range(H):
+        if empty[y, 0]:
+            vis[y, 0] = True
+            q.append((y, 0))
+        if empty[y, W - 1]:
+            vis[y, W - 1] = True
+            q.append((y, W - 1))
+    while q:
+        y, x = q.popleft()
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            ny, nx = y + dy, x + dx
+            if 0 <= ny < H and 0 <= nx < W and empty[ny, nx] and not vis[ny, nx]:
+                vis[ny, nx] = True
+                q.append((ny, nx))
+    interior = empty & ~vis
+    if not interior.any():
+        return im
+    seen = np.zeros((H, W), dtype=bool)
+    filled = 0
+    for y, x in zip(*np.where(interior & ~seen)):
+        if seen[y, x]:
+            continue
+        q = deque([(y, x)])
+        seen[y, x] = True
+        cells = [(y, x)]
+        border = []
+        while q:
+            cy, cx = q.popleft()
+            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                ny, nx = cy + dy, cx + dx
+                if not (0 <= ny < H and 0 <= nx < W):
+                    continue
+                if interior[ny, nx] and not seen[ny, nx]:
+                    seen[ny, nx] = True
+                    q.append((ny, nx))
+                    cells.append((ny, nx))
+                elif a[ny, nx, 3] > 40:
+                    border.append(a[ny, nx, :3])
+        if len(cells) > max_area or not border:
+            continue
+        col = np.median(np.stack(border), axis=0).astype(np.uint8)
+        for cy, cx in cells:
+            a[cy, cx, :3] = col
+            a[cy, cx, 3] = 255
+            filled += 1
+    if filled:
+        print(f"  fill_enclosed_holes: {filled} px")
+    return Image.fromarray(a, "RGBA")
+
+
 def strip_trail_pixels(im: Image.Image) -> Image.Image:
     """只清外围粉/米色尘；保护白毛领、肤色、眼、袍、杖橙。"""
     a = np.array(im.convert("RGBA"))
@@ -178,9 +243,9 @@ def strip_trail_pixels(im: Image.Image) -> Image.Image:
 
 
 def clean_ball(im: Image.Image) -> Image.Image:
-    """成球旋转前：去掉游离尾气，保留脸/毛领；尾气旋转后再 stamp。"""
+    """成球旋转前：去游离尾气、填内部抠穿；尾气旋转后再 stamp。"""
     # 不再 clip_soft_aura：会啃掉半透明脸边与毛领 AA
-    return crop_alpha(strip_trail_pixels(keep_largest(im)))
+    return crop_alpha(fill_enclosed_holes(strip_trail_pixels(keep_largest(im))))
 
 
 def fit_once(im: Image.Image, target_max: int) -> Image.Image:
@@ -223,8 +288,8 @@ def rotate_body(crop: Image.Image, angle: float) -> Image.Image:
 
 
 def ball_spin_cell(ball: Image.Image, angle: float, lock: int) -> Image.Image:
-    """旋转 → 统一 fit(lock) → 贴地。成球段最大边长恒为 lock。"""
-    spun = fit_once(rotate_body(ball, angle), lock)
+    """旋转 → 统一 fit(lock) → 填旋转产生的内部洞 → 贴地。"""
+    spun = fit_once(fill_enclosed_holes(rotate_body(ball, angle)), lock)
     return plant_ground(spun)
 
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Character registry — add a playable character here.
  *
  * Steps for a new id (example: archer):
@@ -9,13 +9,13 @@
  * 帧数只允许 **4 / 9 / 16**（只补不减）。
  * 散帧调试产物在 `dev/art-raw/singles/`，不进局内加载。
  */
-export const ASSET_VER = '20260819t';
+export const ASSET_VER = '20260821lj';
 
 export const CHAR_NAMES = { mage: '法师', warrior: '战士' };
 
 export const PORTRAIT_ASSETS = {
-  mage: { src: 'assets/mage-portrait.png', img: null, ready: false },
-  warrior: { src: 'assets/warrior-portrait.png', img: null, ready: false },
+  mage: { src: 'assets/characters/mage/mage-portrait.png', img: null, ready: false },
+  warrior: { src: 'assets/characters/warrior/warrior-portrait.png', img: null, ready: false },
 };
 
 /**
@@ -29,62 +29,86 @@ export const CHAR_SPRITES = {
 
 /**
  * 跑步真源：`*-run-sheet.png` **3×3 / 9 帧**（原 8 补 1）。
- * runFootLocalX / runLockW 来自 manifest content，禁止运行时 getImageData。
+ * runFootLocalX：脚锚（格内 x）。runLockW：仅兜底无 content 盒时用；有 manifest 时绘制走整格 content，禁止再按 lockW 裁杖尖。
  */
 export const CHAR_RUN_SHEETS = {
   mage: {
-    src: 'assets/mage-run-sheet.png', img: null, ready: false, frames: null,
-    refH: 296, cols: 3, rows: 3, frameCount: 9, runFootLocalX: 256, runLockW: 205,
+    src: 'assets/characters/mage/mage-run-sheet.png', img: null, ready: false, frames: null,
+    refH: 296, cols: 3, rows: 3, frameCount: 9, runFootLocalX: 256, runLockW: 300,
   },
   warrior: {
-    src: 'assets/warrior-run-sheet.png', img: null, ready: false, frames: null,
-    refH: 296, cols: 3, rows: 3, frameCount: 9, runFootLocalX: 256, runLockW: 238,
+    src: 'assets/characters/warrior/warrior-run-sheet.png', img: null, ready: false, frames: null,
+    refH: 296, cols: 3, rows: 3, frameCount: 9, runFootLocalX: 256, runLockW: 310,
   },
 };
 
 /** 翻滚真源：`*-roll-sheet.png` **3×3 / 9 帧**（首尾跑步尺跳过，播中间 7）。 */
 export const CHAR_ROLL_SHEETS = {
   mage: {
-    src: 'assets/mage-roll-sheet.png', img: null, ready: false, frames: null,
+    src: 'assets/characters/mage/mage-roll-sheet.png', img: null, ready: false, frames: null,
     refH: 296, cols: 3, rows: 3, frameCount: 9, bookends: true,
   },
   warrior: {
-    src: 'assets/warrior-roll-sheet.png', img: null, ready: false, frames: null,
+    src: 'assets/characters/warrior/warrior-roll-sheet.png', img: null, ready: false, frames: null,
     refH: 296, cols: 3, rows: 3, frameCount: 9, bookends: true,
   },
 };
 
 /**
  * 跳跃真源：`*-jump-sheet.png` **3×3 / 9 帧**（首尾跑步尺 + 7 动作）。
- * 格序：run | ant | rise | jump | arc | fly | fall | land | run
+ * 格序：run | ant | jump | rise | peak | fall | recover | land | run
+ * 无水平巡航飞姿；起飞道具 / 高空巡航见 CHAR_FLY_SHEETS。
  */
 export const CHAR_JUMP_SHEETS = {
   mage: {
-    src: 'assets/mage-jump-sheet.png', img: null, ready: false, frames: null,
+    src: 'assets/characters/mage/mage-jump-sheet.png', img: null, ready: false, frames: null,
     refH: 296, cols: 3, rows: 3, frameCount: 9, bookends: true,
-    roles: ['jumpAnt', 'jump', 'jumpRise', 'fly', 'flyFall', 'jumpLand', 'jumpRecover'],
+    roles: ['jumpAnt', 'jump', 'jumpRise', 'jumpPeak', 'jumpFall', 'jumpRecover', 'jumpLand'],
   },
   warrior: {
-    src: 'assets/warrior-jump-sheet.png', img: null, ready: false, frames: null,
+    src: 'assets/characters/warrior/warrior-jump-sheet.png', img: null, ready: false, frames: null,
     refH: 296, cols: 3, rows: 3, frameCount: 9, bookends: true,
-    roles: ['jumpAnt', 'jump', 'jumpRise', 'fly', 'flyFall', 'jumpLand', 'jumpRecover'],
+    roles: ['jumpAnt', 'jump', 'jumpRise', 'jumpPeak', 'jumpFall', 'jumpRecover', 'jumpLand'],
   },
 };
 
 /**
- * 攻击真源：`*-atk-sheet.png` **2×2 / 4 帧**（首尾跑步尺 + wind/atk）。
- * 格序：run | atkWind | atk | run
+ * 飞行真源：`*-fly-sheet.png` **2×2 / 4 帧**（首尾跑步尺 + 巡航/落势）。
+ * 格序：run | fly | flyFall | run — skySprint / 起飞道具用。
+ */
+export const CHAR_FLY_SHEETS = {
+  mage: {
+    src: 'assets/characters/mage/mage-fly-sheet.png', img: null, ready: false, frames: null,
+    refH: 296, cols: 2, rows: 2, frameCount: 4, bookends: true,
+    roles: ['fly', 'flyFall'],
+  },
+  warrior: {
+    src: 'assets/characters/warrior/warrior-fly-sheet.png', img: null, ready: false, frames: null,
+    refH: 296, cols: 2, rows: 2, frameCount: 4, bookends: true,
+    roles: ['fly', 'flyFall'],
+  },
+};
+
+/**
+ * 攻击真源：`*-atk-sheet.png`（首尾跑步尺 + 中间招式）。
+ * 法师/战士均可 **3×3 / 9**（贴地跑步攻击，中间换迈步相）。
+ * 法师：杖刺；战士：从上往下挥砍（overhead）。格序含 follow/recover，由 peak 过渡回 run。
+ *   run | wind | start | rise | atk | peak | follow | recover | run
  */
 export const CHAR_ATK_SHEETS = {
   mage: {
-    src: 'assets/mage-atk-sheet.png', img: null, ready: false, frames: null,
-    refH: 296, cols: 2, rows: 2, frameCount: 4, bookends: true,
-    roles: ['atkWind', 'atk'],
+    src: 'assets/characters/mage/mage-atk-sheet.png', img: null, ready: false, frames: null,
+    refH: 296, cols: 3, rows: 3, frameCount: 9, bookends: true,
+    roles: [
+      'atkWind', 'atkStart', 'atkRise', 'atk', 'atkPeak', 'atkFollow', 'atkRecover',
+    ],
   },
   warrior: {
-    src: 'assets/warrior-atk-sheet.png', img: null, ready: false, frames: null,
-    refH: 296, cols: 2, rows: 2, frameCount: 4, bookends: true,
-    roles: ['atkWind', 'atk'],
+    src: 'assets/characters/warrior/warrior-atk-sheet.png', img: null, ready: false, frames: null,
+    refH: 296, cols: 3, rows: 3, frameCount: 9, bookends: true,
+    roles: [
+      'atkWind', 'atkStart', 'atkRise', 'atk', 'atkPeak', 'atkFollow', 'atkRecover',
+    ],
   },
 };
 
@@ -137,8 +161,22 @@ export function registerCharacter(id, def) {
       frameCount: def.jumpSheet.frameCount ?? 9,
       bookends: def.jumpSheet.bookends !== false,
       roles: def.jumpSheet.roles || [
-        'jumpAnt', 'jump', 'jumpRise', 'fly', 'flyFall', 'jumpLand', 'jumpRecover',
+        'jumpAnt', 'jump', 'jumpRise', 'jumpPeak', 'jumpFall', 'jumpRecover', 'jumpLand',
       ],
+    };
+  }
+  if (def.flySheet) {
+    CHAR_FLY_SHEETS[id] = {
+      src: def.flySheet.src,
+      img: null,
+      ready: false,
+      frames: null,
+      refH: def.flySheet.refH ?? DEFAULT_REF_H,
+      cols: def.flySheet.cols ?? 2,
+      rows: def.flySheet.rows ?? 2,
+      frameCount: def.flySheet.frameCount ?? 4,
+      bookends: def.flySheet.bookends !== false,
+      roles: def.flySheet.roles || ['fly', 'flyFall'],
     };
   }
   if (def.atkSheet) {

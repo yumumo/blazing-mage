@@ -18,6 +18,9 @@ sys.path.insert(0, str(SKILL))
 
 from measure_run_sheet import measure_sheet  # noqa: E402
 from measure_sprites import foot_anchor_x, measure as measure_single  # noqa: E402
+import sys as _sys
+_sys.path.insert(0, str(ROOT))
+from asset_layout import find_asset  # noqa: E402
 
 ASSETS = ROOT.parent / "www" / "castle-parkour" / "assets"
 ALPHA = 12
@@ -27,10 +30,12 @@ SHEETS = [
     ("warrior-run-sheet.png", 3, 3),
     ("mage-jump-sheet.png", 3, 3),
     ("warrior-jump-sheet.png", 3, 3),
-    ("mage-atk-sheet.png", 2, 2),
-    ("warrior-atk-sheet.png", 2, 2),
-    ("mage-roll-sheet.png", 4, 4),
-    ("warrior-roll-sheet.png", 4, 4),
+    ("mage-fly-sheet.png", 2, 2),
+    ("warrior-fly-sheet.png", 2, 2),
+    ("mage-atk-sheet.png", 3, 3),
+    ("warrior-atk-sheet.png", 3, 3),
+    ("mage-roll-sheet.png", 3, 3),
+    ("warrior-roll-sheet.png", 3, 3),
     ("bat-sheet.png", 2, 2),
     ("flyer-sheet.png", 2, 2),
     ("giant-sheet.png", 2, 2),
@@ -119,7 +124,7 @@ def main() -> None:
     run_meta: dict[str, tuple[float, float]] = {}
 
     for name, cols, rows in SHEETS:
-        path = ASSETS / name
+        path = find_asset(name)
         if not path.exists():
             print("MISSING", name)
             continue
@@ -220,10 +225,15 @@ def main() -> None:
             print(f"WARN no runFoot patch for {cid}")
     cfg.write_text(text, encoding="utf-8")
 
-    # bump ASSET_VER
+    # bump ASSET_VER (z → next letter + a, never '{')
     root = ASSETS.parent
     cur = (root / "build-id.txt").read_text(encoding="utf-8").strip()
-    nxt = cur[:-1] + chr(ord(cur[-1]) + 1) if cur[-1].isalpha() else cur + "a"
+    if cur[-1].isalpha() and cur[-1] != "z":
+        nxt = cur[:-1] + chr(ord(cur[-1]) + 1)
+    elif cur[-1] == "z" and len(cur) >= 2 and cur[-2].isalpha() and cur[-2] != "z":
+        nxt = cur[:-2] + chr(ord(cur[-2]) + 1) + "a"  # bz → ca
+    else:
+        nxt = cur + "a"
     old, new = cur.encode(), nxt.encode()
     for p in [
         root / "build-id.txt",

@@ -7,6 +7,7 @@ export {
   CHAR_RUN_SHEETS,
   CHAR_ROLL_SHEETS,
   CHAR_JUMP_SHEETS,
+  CHAR_FLY_SHEETS,
   CHAR_ATK_SHEETS,
   registerCharacter,
   listCharacterIds,

@@ -1,8 +1,8 @@
-(() => {
+﻿(() => {
   const BUILD_KEY = 'cp-build-id';
   const RELOAD_KEY = 'cp-build-reloading';
   /** 与 build-id.txt / ASSET_VER 同步 */
-  const EMBEDDED_BUILD = '20260819t';
+  const EMBEDDED_BUILD = '20260821lj';
 
   const detectMobileUi = () => {
     if (navigator.userAgentData?.mobile === true) return true;
@@ -75,11 +75,8 @@
   const stored = localStorage.getItem(BUILD_KEY);
   if (!stored) localStorage.setItem(BUILD_KEY, EMBEDDED_BUILD);
 
-  const known = localStorage.getItem(BUILD_KEY) || EMBEDDED_BUILD;
-  const suspectUpdate = known !== EMBEDDED_BUILD;
-  fetch('build-id.txt', {
-    cache: suspectUpdate ? 'no-store' : 'no-cache',
-  })
+  // 静态服对 png/js 常带 immutable；build-id 必须 no-store，否则 F5 看不到新贴图
+  fetch('build-id.txt', { cache: 'no-store' })
     .then(async (res) => {
       if (!res.ok) return;
       const buildId = String(await res.text()).trim();

@@ -643,14 +643,14 @@ def import_roll(cid: str, ref_h: int, cols: int | None = None) -> None:
             f"{(box[2]-box[0]) if box else 0}x{(box[3]-box[1]) if box else 0} "
             f"touch={touch or 'ok'}"
         )
-    dest = ASSETS / f"{cid}-roll-sheet.png"
+    dest = (ASSETS / "characters" / cid / f"{cid}-roll-sheet.png")
     out.save(dest)
     print(f"  wrote {dest.name} {out.size} cols={n}")
 
 
 def strip_guides_in_assets_roll(cid: str) -> None:
     """In-place cleanup if re-import not desired — strips guide purple per cell."""
-    path = ASSETS / f"{cid}-roll-sheet.png"
+    path = (ASSETS / "characters" / cid / f"{cid}-roll-sheet.png")
     im = Image.open(path).convert("RGBA")
     a = np.array(im)
     H, W = a.shape[:2]

@@ -196,7 +196,7 @@ def bake_single(cid: str, role: str, target_head: float, ref_h: int) -> dict:
 
 
 def bake_roll(cid: str, target_head: float, ref_h: int) -> list[dict]:
-    path = ASSETS / f"{cid}-roll-sheet.png"
+    path = (ASSETS / "characters" / cid / f"{cid}-roll-sheet.png")
     sheet = Image.open(path).convert("RGBA")
     W, H = sheet.size
     cols = max(3, round(W / 512))
@@ -282,7 +282,7 @@ def remasure_sheet(path: Path, cols: int, rows: int = 1) -> None:
 
 def run_target(cid: str, man: dict) -> float:
     """Head target from CURRENT run sheet cells (must remasure before call)."""
-    run = Image.open(ASSETS / f"{cid}-run-sheet.png").convert("RGBA")
+    run = Image.open((ASSETS / "characters" / cid / f"{cid}-run-sheet.png")).convert("RGBA")
     key = f"{cid}-run-sheet.png"
     frames = man["sheets"][key]["frames"]
     # Safety: if manifest still has old 3x3 rects on a 1x8 strip, ignore and scan equal cells
@@ -318,10 +318,10 @@ def main() -> None:
 
     # 0) Remasure run + roll sheets with correct cols BEFORE head bake
     for cid in ("mage", "warrior"):
-        rp = ASSETS / f"{cid}-run-sheet.png"
+        rp = (ASSETS / "characters" / cid / f"{cid}-run-sheet.png")
         if rp.exists():
             remasure_sheet(rp, sheet_cols(rp), 1 if sheet_cols(rp) >= 6 else 3)
-        roll = ASSETS / f"{cid}-roll-sheet.png"
+        roll = (ASSETS / "characters" / cid / f"{cid}-roll-sheet.png")
         if roll.exists():
             remasure_sheet(roll, sheet_cols(roll), 1)
 

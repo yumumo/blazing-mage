@@ -2,12 +2,17 @@
 node_modules/
 .DS_Store
 Thumbs.db
+ehthumbs.db
 desktop.ini
 *.log
 .vscode/
 .idea/
 .env
 .env.*
+.venv/
+venv/
+*.swp
+*.psd
 
 # caches / build / smoke
 _smoke_*
@@ -24,29 +29,33 @@ __pycache__/
 *.temp
 *.local-bak
 *.pre-unify.bak
+*.before-mattefix*.png
+*.before-*.png
 
-# 临时一次性脚本（正式管线脚本用正常文件名）
+# 临时一次性脚本（正式管线用正常文件名）
 dev/_*.py
+dev/_archive_oneoff_*/
+dev/_archive_*/
 
-# 美术管线中间态（品红 / 抠图 / spun 只留本机）
+# 美术中间态（品红 / 抠图 / 预览 / QA scratch）— 真源在 Back-castle-parkour/
 dev/art-raw/
+dev/art-sheets/
 dev/.cursor-core/
 *-magenta.png
+*_preview_*.png
+_preview_*.png
 
 # 误放的重复目录（真源是仓库根 dev/）
 www/dev/
 www/castle-parkour/dev/
 
-# 旧跑步散帧：局内只用 *-run-sheet.png
-www/castle-parkour/assets/mage-run[0-9].png
-www/castle-parkour/assets/warrior-run[0-9].png
-
-# 调试图 / 废弃备份（勿与局内 *-jump-sheet / *-atk-sheet 混淆）
-www/castle-parkour/assets/*-before-scale.png
-www/castle-parkour/assets/monster-walk-sheet.png
-www/castle-parkour/assets/portal-framed.png
-www/castle-parkour/assets/title-wordmark.png
+# assets 根禁止再丢 PNG（局内只认子目录 characters/ enemies/ world/ ui/ fonts/）
+www/castle-parkour/assets/*.png
 
 # editor / agent 副本（规则与 skill 在主仓 XRK-AGT）
 .cursor/
 .claude/
+.trae/
+
+# 非局内备份（品红中间态 / 验收表）— 不随游戏仓上传
+Back-castle-parkour/

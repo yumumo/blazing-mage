@@ -41,9 +41,12 @@
 | 路径 | 进站 | 说明 |
 |------|:----:|------|
 | `www/castle-parkour/` | ✅ | 游戏壳、`js/`、`css/`、**局内** `assets/` |
-| `dev/*.py` · `dev/art-sheets/` | ❌ | 美术管线；验收 sheet 不进 CDN |
-| `dev/art-raw/` | ❌ | gitignore |
+| `dev/*.py` · `dev/README.md` | ❌ | 美术管线（不进 CDN） |
+| `Back-castle-parkour/` | ❌ | 品红中间态 / 验收表备份（gitignore） |
 
-局内 PNG 清单：[www/castle-parkour/ASSETS.md](www/castle-parkour/ASSETS.md)。扩展点：`js/config/`（角色 / 世界 / `PLATFORM_*` 等）。
+局内 PNG 清单：[www/castle-parkour/ASSETS.md](www/castle-parkour/ASSETS.md)。扩展点：`js/config/`（`registerCharacter` / `registerWorldAsset` / `registerMonster`；难度 `DIFF_*`）。
+
+上传前确认 `.gitignore` 挡住 `Back-castle-parkour/`；新 `dev/*.py` 若未跟踪需自行 `git add`。**不要**提交品红原图。
+
 
 首启加载立绘 + 出战角色开跑资源；世界与另一角色 idle 预取。改资源后 bump `ASSET_VER`，并同步 `build-id.txt`、`index.html` 的 `?v=`、`boot-mobile.js` 的 `EMBEDDED_BUILD`——**仅版本变化**时自动硬刷一次。

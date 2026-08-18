@@ -10,6 +10,12 @@ export const CHAR_X = 120;
 export const CHAR_W = 30;
 export const CHAR_H_STAND = 2 * U;
 export const CHAR_H_DUCK = 1 * U;
+/**
+ * 站立/跑/跳/攻身体碰撞（跨角色锁死）。
+ * 绘制可含杖剑羽冠外扩；受击体积不跟贴图 bbox 漂移。
+ */
+export const BODY_HIT_W = CHAR_W;
+export const BODY_HIT_H = CHAR_H_STAND;
 
 export const JUMP_H = 2.6 * U;
 export const GRAV = 2000;
@@ -22,7 +28,20 @@ export const BEAM_BOTTOM = GROUND - 1.5 * U;
 
 export const ATTACK_CD = 0.28;
 export const WARRIOR_ATTACK_CD = 0.3;
+/**
+ * 动作墙钟时长（秒）— 与 sheet 中间帧数无关。
+ * 帧变多只加快扫帧；禁止用「帧数×单帧时长」拉长整段动作。
+ * 当前中间帧：atk 7 / jump 7 / roll 7 / fly 2。
+ */
 export const SWORD_SLASH_DUR = 0.22;
+/**
+ * 战士下劈中间格进度累计 ends（0→1），与 CHAR_ATK_SHEETS.warrior.roles 一一对应。
+ * 墙钟仍是 SWORD_SLASH_DUR；只改各格占比：快蓄力 → 出手/命中可读 → 收招略长防抽回。
+ * [wind, start, rise, atk, peak, follow, recover]
+ */
+export const WARRIOR_ATK_ROLE_ENDS = Object.freeze([
+  0.08, 0.16, 0.28, 0.42, 0.56, 0.74, 1,
+]);
 export const MAGE_ATK_DUR = 0.38;
 export const MAGE_ATK_FIRE_AT = 0.14;
 export const FB_SPEED = 700;
@@ -44,9 +63,17 @@ export const BAT_CHASE_VX = 55;
 export const BAT_Y = GROUND - 2 * U - 24;
 
 export const ROLL_DUR = 0.55;
+/** 落地姿态墙钟（秒）；着地→起身扫 jumpLand/jumpRecover，总时长固定 */
+export const LAND_POSE_DUR = 0.34;
+export const LAND_POSE_DUR_SHORT = 0.26;
 export const ROLL_SPEED_BOOST = 200;
 export const ROLL_CD = 0.12;
-/** 翻滚碰撞相对当前帧显示尺寸的比例（略小于贴图，忽略尾气外扩） */
+/**
+ * 翻滚成球目标显示直径（局内 px）— 跨角色锁死，不跟贴图 bbox / run0 羽冠漂移。
+ * ≈ 法师成球相对站立高的自然比例（约 0.72）。
+ */
+export const ROLL_BALL_DRAW = CHAR_H_STAND * 0.72;
+/** 翻滚碰撞相对成球显示直径的比例（略小于贴图，忽略尾气外扩） */
 export const ROLL_HIT_FROM_DRAW = 0.9;
 export const FAST_FALL_V = 1200;
 
@@ -62,6 +89,11 @@ export const MAGNET_PULL_MIN_FLY = 2400;
 export const MAGNET_PULL_R = 500;
 
 export const PX_PER_METER = 26;
+/** 难度相对原曲线：开局 ×1.15，700m 及以后 ×1.50，中间线性 */
+export const DIFF_FLOOR = 1.15;
+export const DIFF_CEIL = 1.50;
+export const DIFF_RAMP_START_M = 100;
+export const DIFF_RAMP_END_M = 700;
 export const KILL_GOLD = 10;
 export const METER_PER_GOLD = 5;
 
