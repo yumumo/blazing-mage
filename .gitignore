@@ -42,8 +42,13 @@ dev/art-raw/
 dev/art-sheets/
 dev/.cursor-core/
 *-magenta.png
+*-keyed.png
+*-keyed-blob.png
 *_preview_*.png
 _preview_*.png
+*_hotonly.png
+*_hotred.png
+zoom_*.png
 
 # 误放的重复目录（真源是仓库根 dev/）
 www/dev/

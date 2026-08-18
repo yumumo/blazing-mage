@@ -67,6 +67,16 @@ def protect(r, g, b, a) -> bool:
     # inconsistently, then hot/defringe still deleted the tip).
     if r > 150 and b > 140 and g < 110 and abs(r - b) < 60 and r > g + 40 and b > g + 40:
         return False
+    # Mage royal purple (hat/robe): blue-ish purple, not hot magenta (R≈B high).
+    if (
+        a >= 40
+        and b > g + 18
+        and g < 125
+        and b > 55
+        and b >= r - 8
+        and not (r > 175 and b > 175 and g < 130 and abs(r - b) < 50)
+    ):
+        return True
     if r > 160 and g > 90 and b < 120 and r > b + 40:
         return True
     if r > 180 and g > 160 and b > 120 and min(r, g, b) > 110:
@@ -90,18 +100,21 @@ def protect(r, g, b, a) -> bool:
     return False
 
 
-def is_mag(r, g, b, a) -> bool:
+def is_mag(r, g, b, a, *, soft: bool = True) -> bool:
     if a < 12:
         return True
     hot = r > 185 and b > 185 and g < 130 and abs(r - b) < 55
+    if not soft:
+        return hot
     # soft: do NOT treat silver/grey (low sat) as magenta
     if min(r, g, b) > 100 and max(r, g, b) - min(r, g, b) < 55:
         return False
-    soft = r > 155 and b > 145 and g < 165 and r > g + 15 and b > g + 8 and abs(r - b) < 75
-    return hot or soft
+    # abs(r-b) must stay tight: 75 was eating royal-purple hat/robe AA
+    soft_m = r > 170 and b > 170 and g < 140 and r > g + 20 and b > g + 20 and abs(r - b) < 30
+    return hot or soft_m
 
 
-def chroma(im: Image.Image) -> Image.Image:
+def chroma(im: Image.Image, *, defringe: bool = True, soft_mag: bool = True) -> Image.Image:
     a = np.array(im.convert("RGBA"))
     H, W = a.shape[:2]
     r, g, b, al = a[:, :, 0], a[:, :, 1], a[:, :, 2], a[:, :, 3]
@@ -122,31 +135,57 @@ def chroma(im: Image.Image) -> Image.Image:
         rr, gg, bb, aa = int(r[y, x]), int(g[y, x]), int(b[y, x]), int(al[y, x])
         if protect(rr, gg, bb, aa):
             continue
-        if not is_mag(rr, gg, bb, aa):
+        if not is_mag(rr, gg, bb, aa, soft=soft_mag):
             continue
         mask[y, x] = True
         for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             q.append((y + dy, x + dx))
     a[mask, 3] = 0
-    hot = (al > 40) & (r > 200) & (b > 200) & (g < 100) & (np.abs(r.astype(int) - b) < 50)
+    rr = a[:, :, 0].astype(int)
+    gg = a[:, :, 1].astype(int)
+    bb = a[:, :, 2].astype(int)
+    royal = (bb > rr + 12) & (bb > gg + 25) & (bb > 70) & (gg < 120)
+    plume = (rr > 150) & (gg < 90) & (bb < 90) & (rr > gg + 60)
+    cream = (rr > 145) & (gg > 115) & (bb < 210) & (rr > bb + 6)
+    keep = royal | plume | cream
+    hot = (al > 12) & (r > 185) & (b > 185) & (g < 130) & (np.abs(r.astype(int) - b) < 55) & ~keep
     a[hot, 3] = 0
-    # multi-pass edge defringe (soft pink / washed magenta)
-    for _ in range(3):
+    if not defringe:
+        return Image.fromarray(a, "RGBA")
+    # edge defringe: only true magenta AA (not royal purple / plume / fur)
+    for _ in range(2):
         al2 = a[:, :, 3]
         pad = np.pad(al2 <= 20, 1, constant_values=True)
         edge = np.zeros((H, W), bool)
         for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             edge |= pad[1 + dy : H + 1 + dy, 1 + dx : W + 1 + dx]
+        rr = a[:, :, 0].astype(int)
+        gg = a[:, :, 1].astype(int)
+        bb = a[:, :, 2].astype(int)
+        royal = (bb > rr + 12) & (bb > gg + 25) & (bb > 70) & (gg < 120)
+        plume = (rr > 150) & (gg < 90) & (bb < 90) & (rr > gg + 60)
+        cream = (rr > 145) & (gg > 115) & (bb < 210) & (rr > bb + 6)
+        keep = royal | plume | cream
         soft = (
             edge
             & (al2 > 20)
+            & ~keep
             & (a[:, :, 0] > 160)
             & (a[:, :, 2] > 145)
             & (a[:, :, 1] < 175)
-            & (a[:, :, 0].astype(int) > a[:, :, 1].astype(int) + 10)
+            & (np.abs(rr - bb) < 40)
+            & (rr > gg + 10)
         )
         a[soft, 3] = (a[soft, 3].astype(np.float32) * 0.25).astype(np.uint8)
-        hotf = edge & (al2 > 20) & (a[:, :, 0] > 190) & (a[:, :, 2] > 175) & (a[:, :, 1] < 145)
+        hotf = (
+            edge
+            & (al2 > 20)
+            & ~keep
+            & (a[:, :, 0] > 190)
+            & (a[:, :, 2] > 175)
+            & (a[:, :, 1] < 145)
+            & (np.abs(rr - bb) < 40)
+        )
         a[hotf, 3] = 0
     return Image.fromarray(a, "RGBA")
 

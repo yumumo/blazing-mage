@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Character registry — add a playable character here.
  *
  * Steps for a new id (example: archer):
@@ -9,7 +9,7 @@
  * 帧数只允许 **4 / 9 / 16**（只补不减）。
  * 散帧调试产物在 `dev/art-raw/singles/`，不进局内加载。
  */
-export const ASSET_VER = '20260821lj';
+export const ASSET_VER = '20260821me';
 
 export const CHAR_NAMES = { mage: '法师', warrior: '战士' };
 

@@ -2127,7 +2127,15 @@ function update(dt) {
   // 玩家物理
   if (skySprintActive) {
     skySprintTime += dt;
-    px = SKY_SPRINT_H;
+    const dur = skySprintDurActive;
+    const fade = SKY_SPRINT_FADE;
+    // 末段淡出真正下落，好让 flyFall（v3）对上姿态
+    if (skySprintTime >= dur - fade) {
+      const u = Math.max(0, Math.min(1, (skySprintTime - (dur - fade)) / Math.max(0.001, fade)));
+      px = SKY_SPRINT_H * (1 - u);
+    } else {
+      px = SKY_SPRINT_H;
+    }
     vy = 0;
     ducking = false; rollTimer = 0;
     if (skySprintTime >= skySprintDurActive) {
@@ -5750,17 +5758,12 @@ function pickCharSprite(charId) {
   }
 
   if (skySprintActive) {
-    // 墙钟 = skySprintDurActive；fly 表中间帧均分巡航进度
-    const flyRoles = CHAR_FLY_SHEETS[charId]?.roles || ['fly', 'flyFall'];
-    const p = Math.max(0, Math.min(1, skySprintTime / Math.max(0.001, skySprintDurActive)));
-    const idx = sheetRoleIndex(flyRoles, p);
-    return pickRoleSprite(
-      charId,
-      ...preferAroundRoles(flyRoles, idx),
-      'fly',
-      'jump',
-      'jumpAnt',
-    );
+    // 巡航 = fly（v2 水平）；下落淡出 = flyFall（v3 斜下）
+    const descending = skySprintTime > skySprintDurActive - SKY_SPRINT_FADE;
+    if (descending) {
+      return pickRoleSprite(charId, 'flyFall', 'fly', 'jumpFall', 'jump');
+    }
+    return pickRoleSprite(charId, 'fly', 'jump', 'jumpAnt');
   }
 
   const h = heightAboveSupport();

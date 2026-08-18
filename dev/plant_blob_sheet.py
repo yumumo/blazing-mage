@@ -79,7 +79,7 @@ def fill_enclosed_magenta(im: Image.Image) -> Image.Image:
         & (g < 165)
         & (r > g + 15)
         & (b > g + 8)
-        & (np.abs(r - b) < 75)
+        & (np.abs(r - b) < 40)
         & ~lowsat
     )
     is_mag = ((al < 12) | hot | soft) & (al >= 0)
@@ -281,7 +281,15 @@ def eye_safe_defringe(im: Image.Image, passes: int = 3) -> Image.Image:
         skin = (r > 140) & (g > 90) & (b > 70) & (r > b) & (r < 230)
         cyan = (b > 140) & (g > 140) & (r < 180)
         metal = (r > 90) & (g > 90) & (b > 90) & (np.abs(r - g) < 40) & (np.abs(g - b) < 40)
-        protect = whiteish | cream | skin | cyan | metal
+        royal = (
+            (b > g + 18)
+            & (g < 125)
+            & (b > 55)
+            & (b >= r - 8)
+            & ~((r > 175) & (b > 175) & (g < 130) & (np.abs(r - b) < 50))
+        )
+        plume = (r > 150) & (g < 90) & (b < 90) & (r > g + 60)
+        protect = whiteish | cream | skin | cyan | metal | royal | plume
         hot = (
             edge
             & (al > 15)
@@ -331,7 +339,17 @@ def scrub_magenta_residue(im: Image.Image) -> Image.Image:
     plume = (al > 40) & (r > 160) & (g < 100) & (b < 55) & (r > b + 90)
     gold = (al > 40) & (r > 160) & (g > 100) & (b < 110) & (r > b + 40)
     cream = (al > 40) & (r > 145) & (g > 115) & (b < 210) & (r > b + 6)
-    protect = plume | gold | cream
+    # Mage hat/robe: blue-ish purple. Must NOT match hot magenta (R≈B high).
+    hot_mag = (r > 175) & (b > 175) & (g < 130) & (np.abs(r - b) < 50)
+    royal = (
+        (al > 40)
+        & (b > g + 18)
+        & (g < 125)
+        & (b > 55)
+        & (b >= r - 8)
+        & ~hot_mag
+    )
+    protect = plume | gold | cream | royal
 
     # Broad magenta / purple-pink (includes dark AA like RGB≈37,3,39)
     pinkish = (
@@ -344,7 +362,7 @@ def scrub_magenta_residue(im: Image.Image) -> Image.Image:
         & ((r > 28) | (b > 28))
         & (np.maximum(r, b) > 35)
     )
-    hot = (al > 12) & (r > 175) & (b > 175) & (g < 130) & (np.abs(r - b) < 60) & ~protect
+    hot = (al > 12) & hot_mag & ~protect
     fleck = (
         (al > 12)
         & (g < 40)
@@ -401,7 +419,14 @@ def scrub_magenta_residue(im: Image.Image) -> Image.Image:
     # Heal outline: pinkish on silhouette edge next to metal → pure black
     # Do NOT heal hilt_pink into black (those are junk → delete)
     heal = pinkish & edge & near_solid & ~hilt_pink
-    kill = (hot | fleck | hilt_pink | (soft_edge & edge) | (pinkish & ~heal)) & ~heal
+    # pinkish only on edges — interior purple robe must not be wiped
+    kill = (
+        hot
+        | (fleck & edge)
+        | hilt_pink
+        | (soft_edge & edge)
+        | (pinkish & edge & ~heal)
+    ) & ~heal
 
     n_heal = int(heal.sum())
     n_kill = int(kill.sum())
@@ -567,7 +592,9 @@ def assign_grid(
     blobs: list, cols: int, rows: int, W: int, H: int
 ) -> list[tuple[int, int, int, int] | None]:
     need = cols * rows
-    cands = blobs[: max(need * 3, need)]
+    # Only the N largest islands — dust/orb fragments near a cell center
+    # must not beat the actual character in that slot.
+    cands = blobs[:need]
     if len(cands) < need:
         return [None] * need
     slots = []
@@ -610,6 +637,65 @@ def cell_size_for(crops: list[Image.Image | None], run0: Image.Image) -> tuple[i
     return cw, ch, foot_y
 
 
+def heal_hot_edge_to_neighbor(im: Image.Image) -> Image.Image:
+    """Recolor magenta fringe to nearest solid pixel instead of punching it out.
+
+    Deleting AA leaves a jagged black outline; leaving it looks like a pink halo.
+    """
+    a = np.array(im.convert("RGBA"))
+    H, W = a.shape[:2]
+    r = a[:, :, 0].astype(np.int16)
+    g = a[:, :, 1].astype(np.int16)
+    b = a[:, :, 2].astype(np.int16)
+    al = a[:, :, 3]
+    hot = (al > 12) & (r > 170) & (b > 170) & (g < 140) & (np.abs(r - b) < 55)
+    pad = np.pad(al <= 20, 1, constant_values=True)
+    edge = np.zeros((H, W), bool)
+    for dy, dx in (
+        (1, 0),
+        (-1, 0),
+        (0, 1),
+        (0, -1),
+        (1, 1),
+        (1, -1),
+        (-1, 1),
+        (-1, -1),
+    ):
+        edge |= pad[1 + dy : H + 1 + dy, 1 + dx : W + 1 + dx]
+    ys, xs = np.where(hot & edge)
+    n_heal = 0
+    n_kill = 0
+    for y, x in zip(ys.tolist(), xs.tolist()):
+        best = None
+        for rad in range(1, 8):
+            for dy in range(-rad, rad + 1):
+                for dx in range(-rad, rad + 1):
+                    if abs(dy) != rad and abs(dx) != rad:
+                        continue
+                    ny, nx = y + dy, x + dx
+                    if not (0 <= ny < H and 0 <= nx < W):
+                        continue
+                    if hot[ny, nx]:
+                        continue
+                    if int(al[ny, nx]) < 120:
+                        continue
+                    best = (int(a[ny, nx, 0]), int(a[ny, nx, 1]), int(a[ny, nx, 2]))
+                    break
+                if best is not None:
+                    break
+            if best is not None:
+                break
+        if best is not None:
+            a[y, x, 0], a[y, x, 1], a[y, x, 2] = best
+            n_heal += 1
+        else:
+            a[y, x, 3] = 0
+            n_kill += 1
+    if n_heal or n_kill:
+        print(f"  heal_hot_edge: healed {n_heal} killed {n_kill}")
+    return Image.fromarray(a, "RGBA")
+
+
 def plant_foot(crop: Image.Image, cell_w: int, cell_h: int, foot_y: int) -> Image.Image:
     """Place crop with feet on foot_y. NEVER shrink to fit — caller expands cell."""
     if crop.width + 2 * MARGIN > cell_w or crop.height + FOOT_GAP + MARGIN > cell_h:
@@ -622,7 +708,9 @@ def plant_foot(crop: Image.Image, cell_w: int, cell_h: int, foot_y: int) -> Imag
     y = foot_y - crop.height
     if y < MARGIN:
         raise ValueError(f"foot plant y={y} < MARGIN; need taller cell")
-    out.paste(crop, (x, y), crop)
+    # Copy RGBA as-is. paste(..., mask=crop) composites onto black and
+    # premuls the outline AA, leaving a chewed dark fringe vs run0.
+    out.paste(crop, (x, y))
     return out
 
 
@@ -665,9 +753,17 @@ def plant(
     h_game = scale_ruler(np.array(game_run0))
     assert h_game
 
-    raw_rgba = fill_enclosed_magenta(Image.open(src).convert("RGBA"))
-    keyed = eye_safe_defringe(chroma(raw_rgba), passes=3)
-    keyed = scrub_magenta_residue(keyed)
+    raw_im = Image.open(src).convert("RGBA")
+    # Mage has no blade islands; fill/punch was chewing robe/hat gaps.
+    if char != "mage":
+        raw_im = fill_enclosed_magenta(raw_im)
+    # 法师：只洪水抠热品红；关 soft/defringe，保留描边 AA（避免啃边锯齿）
+    if char == "mage":
+        keyed = chroma(raw_im, defringe=False, soft_mag=False)
+        keyed = heal_hot_edge_to_neighbor(keyed)
+    else:
+        keyed = eye_safe_defringe(chroma(raw_im), passes=2)
+        keyed = scrub_magenta_residue(keyed)
     keyed = scrub_edge_grid(keyed)  # strip white/gray cut-guides before blob/equal crop
     keyed_path = src.with_name(src.name.replace(".png", "-keyed-blob.png"))
     keyed.save(keyed_path)
@@ -683,8 +779,20 @@ def plant(
     # 0.45 of full sheet width is too tight and forces equal-grid (scale break).
     max_bw = W * (0.62 if cols <= 2 else 0.45)
     max_bh = H * (0.62 if rows <= 2 else 0.45)
-    bad = any(b is None for b in boxes) or any(
-        b is not None and (b[2] - b[0] > max_bw or b[3] - b[1] > max_bh) for b in boxes
+    areas = [
+        (b[2] - b[0]) * (b[3] - b[1]) if b is not None else 0
+        for b in boxes
+    ]
+    finite = [a for a in areas if a > 0]
+    med = sorted(finite)[len(finite) // 2] if finite else 0
+    tiny = bool(med) and any(a > 0 and a < med * 0.35 for a in areas)
+    bad = (
+        any(b is None for b in boxes)
+        or tiny
+        or any(
+            b is not None and (b[2] - b[0] > max_bw or b[3] - b[1] > max_bh)
+            for b in boxes
+        )
     )
     if bad:
         print("  FALLBACK equal-grid crop (blob assign failed)")
@@ -770,6 +878,8 @@ def plant(
                 if abs(ratio - 1.0) > 0.02:
                     scaled = scale_k(scaled, h_game / h2)
                     print(f"  RULER-LOCK c{i} was {ratio:.3f}")
+        if char == "mage" and not self_bookends:
+            scaled = heal_hot_edge_to_neighbor(scaled)
         scaled_cells[i] = scaled
 
     # Run sheet: hard-lock every cell upperW to planted c0 (visual size == run0)
@@ -815,7 +925,8 @@ def plant(
 
     dest = ASSETS / "characters" / char / f"{char}-{role}-sheet.png"
     dest.parent.mkdir(parents=True, exist_ok=True)
-    out = scrub_magenta_residue(out)
+    # Do not scrub the assembled sheet: bookends are game run0 pixels.
+    # Magenta residue is already cleaned on the keyed source.
     out.save(dest)
 
     fails = 0
