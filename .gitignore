@@ -49,6 +49,8 @@ _preview_*.png
 *_hotonly.png
 *_hotred.png
 zoom_*.png
+*_old_pose*.png
+*-cur-c*-dark.png
 
 # 误放的重复目录（真源是仓库根 dev/）
 www/dev/

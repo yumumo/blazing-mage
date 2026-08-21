@@ -4648,46 +4648,57 @@ function drawPortal() {
   const suckBoost = portalSuck ? Math.min(1, portalSuck.t / PORTAL_SUCK_DUR) : 0;
   const drawH = PORTAL_DRAW_H * (1 + 0.08 * suckBoost);
   const pulse = 0.35 + 0.2 * Math.sin(animT * 5) + 0.25 * suckBoost;
-  // 仅旋涡光晕（无门框）
+  // 门体外形固定：椭圆光晕 + 裁剪轮廓不跟着转
+  const rx = drawH * 0.38;
+  const ry = drawH * 0.52;
   const glow = ctx.createRadialGradient(px2, py2, drawH * 0.12, px2, py2, drawH * 0.55);
   glow.addColorStop(0, `rgba(230,180,255,${0.35 + 0.25 * suckBoost})`);
   glow.addColorStop(0.45, `rgba(140,70,220,${0.18 + 0.1 * suckBoost})`);
   glow.addColorStop(1, 'rgba(80,40,160,0)');
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.ellipse(px2, py2, drawH * 0.38, drawH * 0.52, 0, 0, Math.PI * 2);
+  ctx.ellipse(px2, py2, rx, ry, 0, 0, Math.PI * 2);
   ctx.fill();
 
+  // 只在固定椭圆内旋转旋涡贴图，避免整门椭圆轮廓翻滚
+  const swirlAng = animT * (1.6 + suckBoost * 4);
   ctx.save();
-  ctx.translate(px2, py2);
-  ctx.rotate(animT * (1.6 + suckBoost * 4));
-  const spun = drawWorldSprite(WORLD_ASSETS.portal, 0, 0, drawH, 'center');
-  ctx.restore();
-  if (spun) {
-    // 中心亮核
-    ctx.fillStyle = `rgba(255,230,255,${pulse * 0.55})`;
-    ctx.beginPath();
-    ctx.ellipse(px2, py2, 10 + suckBoost * 8, 14 + suckBoost * 10, 0, 0, Math.PI * 2);
-    ctx.fill();
-    return;
-  }
-  // 贴图未就绪时的程序化旋涡
-  ctx.save();
-  ctx.translate(px2, py2);
-  ctx.rotate(animT * 2.5);
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2;
-    ctx.strokeStyle = `rgba(${180 + i * 12},${90 + i * 20},255,${0.55 - i * 0.06})`;
-    ctx.lineWidth = 4 - i * 0.4;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, drawH * (0.18 + i * 0.05), drawH * (0.28 + i * 0.04), a, 0, Math.PI * 1.4);
-    ctx.stroke();
-  }
-  ctx.fillStyle = 'rgba(200,140,255,0.7)';
   ctx.beginPath();
-  ctx.arc(0, 0, 14, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.ellipse(px2, py2, rx, ry, 0, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.translate(px2, py2);
+  ctx.rotate(swirlAng);
+  // 略放大，旋转时裁剪边始终被旋涡填满
+  const spun = drawWorldSprite(WORLD_ASSETS.portal, 0, 0, drawH * 1.12, 'center');
+  if (!spun) {
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      ctx.strokeStyle = `rgba(${180 + i * 12},${90 + i * 20},255,${0.55 - i * 0.06})`;
+      ctx.lineWidth = 4 - i * 0.4;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, drawH * (0.18 + i * 0.05), drawH * (0.28 + i * 0.04), a, 0, Math.PI * 1.4);
+      ctx.stroke();
+    }
+  }
   ctx.restore();
+
+  // 静止门缘：不旋转的描边，读成「门本体」
+  ctx.strokeStyle = `rgba(210,160,255,${0.45 + 0.25 * suckBoost})`;
+  ctx.lineWidth = 2.5 + suckBoost;
+  ctx.beginPath();
+  ctx.ellipse(px2, py2, rx, ry, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = `rgba(255,230,255,${0.18 + 0.12 * suckBoost})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.ellipse(px2, py2, rx * 0.92, ry * 0.92, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 中心亮核（不转）
+  ctx.fillStyle = `rgba(255,230,255,${pulse * 0.55})`;
+  ctx.beginPath();
+  ctx.ellipse(px2, py2, 10 + suckBoost * 8, 14 + suckBoost * 10, 0, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawBonusTint() {

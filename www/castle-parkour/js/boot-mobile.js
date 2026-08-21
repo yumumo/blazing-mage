@@ -2,7 +2,7 @@
   const BUILD_KEY = 'cp-build-id';
   const RELOAD_KEY = 'cp-build-reloading';
   /** 与 build-id.txt / ASSET_VER 同步 */
-  const EMBEDDED_BUILD = '20260821me';
+  const EMBEDDED_BUILD = '20260821mp';
 
   const detectMobileUi = () => {
     if (navigator.userAgentData?.mobile === true) return true;
